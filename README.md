@@ -1,8 +1,44 @@
-# React + Vite
+# Plant E-commerce 
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is my plant e-commerce project. I created it to help users explore indoor plants and find plants they like.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- View indoor plants
+- Filter plants by different options
+- View plant details
+- Browse available plants
+
+## Technologies Used
+
+- React
+- JavaScript
+- Tailwind CSS
+- Python
+- FastAPI
+- MySQL
+
+## About the Project
+
+I built this project to practice my web development skills and learn how to connect the frontend with the backend and database.
+
+## Run the Project
+
+Clone the repository:
+
+```bash
+git clone https://github.com/hsu-nyein-san/Plant-E-commerce.git
+```
+
+Install the frontend dependencies and start the application from the frontend folder:
+
+```bash
+npm install
+npm run dev
+```
+
+The backend and database need to be configured separately.
+
+## Developer
+
+Hsu Nyein San
