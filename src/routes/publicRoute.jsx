@@ -4,6 +4,8 @@ import HousePlants from "../features/plants/pages/HousePlants";
 import PlantFinderPage from "../features/plant-finder/pages/PlantFinderPage";
 import CartPage from "../features/cart/pages/CartPage";
 import CheckoutPage from "../features/checkout/pages/CheckoutPage";
+import OrderPage from "../features/order/page/OrderPage";
+import WishListPage from "../features/wishlist/page/WishListPage";
 
 const AboutUsPage = lazy(() => import("../features/public/pages/AboutUsPage"));
 const ContactUsPage = lazy(() => import("../features/public/pages/ContactUsPage"));
@@ -38,6 +40,14 @@ const publicRoute = [
     path: "contact-us",
     element: <ContactUsPage />,
   },
+  {
+    path:"my-order",
+    element:<OrderPage/>,
+  },
+  {
+    path:"wishlist",
+    element:<WishListPage/>
+  }
   
 ];
 

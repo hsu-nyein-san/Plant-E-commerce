@@ -1,13 +1,15 @@
-
 import BreadCrumb from "../../../components/BreadCrumb";
 import Container from "../../../components/Container";
 import UserProfileCard from "../components/UserProfileCard";
 
 const UserProfilePage = () => {
   return (
-    <section>
+    <section className="min-h-screen bg-surface pb-16">
       <Container>
-        <BreadCrumb currentPageTitle={"User Profile"} />
+        <div className="pt-6">
+          <BreadCrumb currentPageTitle="My Account" />
+        </div>
+
         <UserProfileCard />
       </Container>
     </section>

@@ -1,13 +1,20 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends , HTTPException, status ,UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, Text,DateTime, ForeignKey,func,desc, or_
 from sqlalchemy.orm import sessionmaker, declarative_base, Session ,relationship
-from pydantic import BaseModel
+from pydantic import BaseModel,EmailStr, Field, field_validator , ConfigDict
 from datetime import datetime,timedelta
 from typing import List, Optional, Union
+from jose import JWTError, jwt
 import uvicorn
 import math
-from fastapi import HTTPException
+from passlib.context import CryptContext
+import os
+import uuid
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
 
 DB_USER = 'root'
 DB_PASSWORD = ''
@@ -20,6 +27,12 @@ DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB
 engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")  
+
+SECRET_KEY = "change-this-to-a-long-random-secret-in-production"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  
 
 
 class Plant(Base):
@@ -37,7 +50,7 @@ class Plant(Base):
     size = Column(String(50))
     care_level = Column(String(50))
     style = Column(String(50))
-    category = Column(String(50))            # 👈 NEW
+    category = Column(String(50))            
     description = Column(Text)
 
     # Detail page
@@ -63,8 +76,8 @@ class Order(Base):
     shipping_zip = Column(String(20))
     shipping_country = Column(String(100), default="Myanmar")
 
-    payment_method = Column(String(50))     # Card, ApplePay, GPay
-    payment_last4 = Column(String(4))       # Card ending
+    payment_method = Column(String(50))    
+    payment_last4 = Column(String(4))     
 
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -86,7 +99,52 @@ class OrderItem(Base):
 
     order = relationship("Order", back_populates="items")
 
+class User(Base):
+    __tablename__ = "users"
 
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(200), unique=True, index=True, nullable=False)
+    full_name = Column(String(200), nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    phone = Column(String(50), nullable=True)
+
+    profile_image = Column(String(500), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    addresses = relationship(
+        "Address",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+
+class Address(Base):
+    __tablename__ = "addresses"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    recipient_name = Column(String(200), nullable=False)
+    phone = Column(String(50), nullable=False)
+
+    address_line = Column(String(255), nullable=False)
+    city = Column(String(100), nullable=False)
+    region = Column(String(100), nullable=False)   # <-- Changed from township
+    postal_code = Column(String(20), nullable=True)
+
+    is_default = Column(Boolean, default=False, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="addresses")
 
 Base.metadata.create_all(bind=engine)
 
@@ -189,6 +247,50 @@ class PlantFilterRequest(BaseModel):
     price: Optional[float] = None
     category: Optional[List[str]] = None
 
+class UserSignup(BaseModel):
+    email: EmailStr
+    full_name: str = Field(..., min_length=2, max_length=200)
+    password: str = Field(..., min_length=6, max_length=100)
+    phone: Optional[str] = None
+
+    @field_validator("full_name")
+    @classmethod
+    def name_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("full_name cannot be blank")
+        return v.strip()
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserResponse(BaseModel):
+    id: int
+    email: EmailStr
+    full_name: str
+    phone: Optional[str] = None
+    profile_image: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class UpdateProfile(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=2, max_length=200)
+    phone: Optional[str] = None
+
+class ChangePassword(BaseModel):
+    old_password: str
+    new_password: str = Field(..., min_length=6, max_length=100)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user: UserResponse
+
+
 class PaginatedPlants(BaseModel):
     items: List[PlantResponse]
     total: int
@@ -199,7 +301,43 @@ class PaginatedPlants(BaseModel):
     has_prev: bool
 
 
+class AddressBase(BaseModel):
+    recipient_name: str
+    phone: str
+    address_line: str
+    city: str
+    region: str                                    # <-- Changed from township
+    postal_code: Optional[str] = None
+    is_default: bool = False
+
+class AddressCreate(AddressBase):
+    pass
+
+class AddressUpdate(BaseModel):
+    recipient_name: Optional[str] = None
+    phone: Optional[str] = None
+    address_line: Optional[str] = None
+    city: Optional[str] = None
+    region: Optional[str] = None                   
+    postal_code: Optional[str] = None
+    is_default: Optional[bool] = None
+
+
+class AddressResponse(AddressBase):
+    id: int
+    user_id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+
 app = FastAPI(title="Leafly API")
+
+UPLOAD_DIR=Path("uploads")
+UPLOAD_DIR.mkdir(parents=True,exist_ok=True)
+
+app.mount("/uploads",StaticFiles(directory=str(UPLOAD_DIR)),name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
@@ -216,6 +354,53 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        raise credentials_exception
+    # if not user.is_active:
+    #     raise HTTPException(status_code=403, detail="Account is disabled")
+    return user
+
+
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+
 
 def paginate(query, page: int, limit: int):
     total = query.count()
@@ -246,7 +431,7 @@ def match_plants(selection: dict, db: Session):
     matched = []
 
     print("\n" + "=" * 60)
-    print("🌿 PLANT FINDER MATCHING")
+    print("PLANT FINDER MATCHING")
     print("=" * 60)
     print(f"Light:  {room_light}")
     print(f"Pets:   {has_pets}")
@@ -261,7 +446,6 @@ def match_plants(selection: dict, db: Session):
             print(f"{plant.name}: Not pet safe")
             continue
 
-        # 2. LIGHT
         plant_light = (plant.light_requirement or "").lower()
         light_match = False
         if "sun" in room_light:
@@ -276,7 +460,6 @@ def match_plants(selection: dict, db: Session):
             print(f" {plant.name}: Light mismatch ({plant.light_requirement})")
             continue
 
-        # 3. CARE
         plant_care = (plant.care_level or "").lower()
         plant_maintenance = (plant.maintenance or "").lower()
         care_match = False
@@ -290,7 +473,6 @@ def match_plants(selection: dict, db: Session):
             print(f"{plant.name}: Care mismatch ({plant.care_level}, {plant.maintenance})")
             continue
 
-        # 4. SIZE
         plant_size = (plant.size or "").lower()
         size_match = False
         if "small" in desired_size:
@@ -310,7 +492,7 @@ def match_plants(selection: dict, db: Session):
                 print(f"{plant.name}: Style mismatch ({plant.style})")
                 continue
 
-        print(f"✅ {plant.name}: PERFECT MATCH")
+        print(f" {plant.name}: PERFECT MATCH")
         matched.append(plant)
 
     print("\n" + "=" * 60)
@@ -354,6 +536,171 @@ def get_plant(plant_id: int, db: Session = Depends(get_db)):
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Leafly API"}
+
+
+@app.post("/api/auth/signup", response_model=TokenResponse, status_code=201)
+def signup(payload: UserSignup, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(func.lower(User.email) == payload.email.lower()).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user = User(
+        email=payload.email.lower(),
+        full_name=payload.full_name,
+        phone=payload.phone,
+        hashed_password=hash_password(payload.password),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token({"sub": user.email, "uid": user.id})
+    print(f"\n✅ New signup: {user.email} ({user.full_name})")
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "user": user,
+    }
+
+
+
+@app.post("/api/auth/login", response_model=TokenResponse)
+def login(payload: UserLogin, db: Session = Depends(get_db)):
+    user = db.query(User).filter(func.lower(User.email) == payload.email.lower()).first()
+    if not user or not verify_password(payload.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    # if not user.is_active:
+    #     raise HTTPException(status_code=403, detail="Account is disabled")
+
+    token = create_access_token({"sub": user.email, "uid": user.id})
+    print(f"\n🔓 Login: {user.email}")
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "user": user,
+    }
+
+
+@app.post("/api/auth/token", response_model=TokenResponse)
+def login_form(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(func.lower(User.email) == form_data.username.lower()).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    # if not user.is_active:
+    #     raise HTTPException(status_code=403, detail="Account is disabled")
+
+    token = create_access_token({"sub": user.email, "uid": user.id})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "user": user,
+    }
+
+
+
+@app.get("/api/auth/me", response_model=UserResponse)
+def me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@app.patch("/api/auth/me", response_model=UserResponse)
+def update_me(
+    payload: UpdateProfile,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if payload.full_name is not None:
+        current_user.full_name = payload.full_name
+    if payload.phone is not None:
+        current_user.phone = payload.phone
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@app.post("/api/auth/change-password")
+def change_password(
+    payload: ChangePassword,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(payload.old_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Old password is incorrect")
+    current_user.hashed_password = hash_password(payload.new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
+
+@app.post("/api/auth/profile-image")
+async def upload_profile_image(
+    file:UploadFile=File(...),
+    current_user:User = Depends(get_current_user),
+    db:Session = Depends(get_db)
+):
+    allowed_types={
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+    }
+
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Only JPG, PNG, and WebP images are allowed"
+        )
+    content=await file.read()
+
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty image file")
+
+    if(len(content) >2 * 1024 * 1024):
+        raise HTTPException(
+            status_code=400,
+            detail="Image must be smaller than 2 MB"
+        )
+
+    extension=allowed_types[file.content_type]
+    filename=f"user_{current_user.id}_{uuid.uuid4().hex}{extension}"
+    file_path=UPLOAD_DIR/filename
+
+    try:
+        with file_path.open("wb") as image:
+            image.write(content)
+    finally:
+        await file.close()
+
+    current_user.profile_image=f"/uploads/{filename}"
+
+    db.commit()
+    db.refresh(current_user)
+
+    return {
+        "message": "Profile image updated successfully",
+        "profile_image": current_user.profile_image,
+    }
+
+
+@app.post("/api/auth/logout")
+def logout(current_user: User = Depends(get_current_user)):
+    return {"message": f"Logged out {current_user.email}"}
+
+
+
+@app.get("/api/auth/users", response_model=list[UserResponse])
+def list_users(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return db.query(User).order_by(User.id).all()
+
+
 
 
 
@@ -745,6 +1092,91 @@ def create_plant(plant: PlantCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_plant)
     return db_plant
+
+
+@app.post("/api/addresses/", response_model=list[AddressResponse])
+def create_address(
+    data: AddressCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if data.is_default:
+        db.query(Address).filter(
+            Address.user_id == current_user.id,
+            Address.is_default.is_(True),
+        ).update({"is_default": False})
+
+    address = Address(
+        **data.model_dump(),
+        user_id=current_user.id,
+    )
+
+    db.add(address)
+    db.commit()
+    db.refresh(address)
+
+    return address
+
+@app.patch("/api/addresses/{address_id}", response_model=AddressResponse)
+def patch_address(
+    address_id: int,
+    data: AddressUpdate,  
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    
+    address = (
+        db.query(Address)
+        .filter(Address.id == address_id, Address.user_id == current_user.id)
+        .first()
+    )
+    if not address:
+        raise HTTPException(404, "Address not found")
+
+    update_data = data.model_dump(exclude_unset=True)
+
+    if update_data.get("is_default") is True:
+        db.query(Address).filter(
+            Address.user_id == current_user.id,
+            Address.id != address_id,
+            Address.is_default.is_(True),
+        ).update({"is_default": False})
+
+    for key, value in update_data.items():
+        setattr(address, key, value)
+
+    db.commit()
+    db.refresh(address)
+
+    print(f"Address {address_id} patched for {current_user.email}")
+    return address
+
+
+
+@app.get("/api/addresses/", response_model=list[AddressResponse])
+def get_addresses(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return db.query(Address).filter(
+        Address.user_id == current_user.id
+    ).all()
+
+@app.get("/api/addresses/{address_id}", response_model=AddressResponse)
+def get_address(
+    address_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    
+    address = (
+        db.query(Address)
+        .filter(Address.id == address_id, Address.user_id == current_user.id)
+        .first()
+    )
+    if not address:
+        raise HTTPException(404, "Address not found")
+    return address
 
 
 def seed_plants():

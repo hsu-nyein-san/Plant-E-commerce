@@ -7,6 +7,7 @@ import publicRoute from "./publicRoute";
 import authRoute from "./authRoute";
 import dashboardRoute from "./dashboardRoute";
 import NotFound from "../components/NotFound";
+import userProfileRoute from "./userProfileRoute";
 
 const router = createBrowserRouter([
   {
@@ -22,6 +23,7 @@ const router = createBrowserRouter([
 
   ...authRoute,
   ...dashboardRoute,
+  ...userProfileRoute
 ]);
 
 export default router;
