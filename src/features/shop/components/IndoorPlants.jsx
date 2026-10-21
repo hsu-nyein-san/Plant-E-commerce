@@ -1,16 +1,21 @@
 import { ChevronDown, Eye, Heart, X } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
+import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
+import useCookie from 'react-use-cookie'
 
-const IndoorPlants = ({ result,pagination,onPageChange,setResult,setPagination }) => {
+const IndoorPlants = ({ result, pagination, onPageChange, setResult, setPagination }) => {
   const [productData, setProductData] = useState([])
   const [loading, setLoading] = useState(true)
+  const [wishlist, setWishlist] = useState([]);
   const [error, setError] = useState(null)
-  const [page,setPage]=useState(1)
-  const LIMIT=6;
+  const [page, setPage] = useState(1)
+  const LIMIT = 6;
+
+  const [token] = useCookie("token")
 
   // console.log(pagination?.page);
-  
+
 
   useEffect(() => {
     const mapPlant = (p) => ({
@@ -21,10 +26,9 @@ const IndoorPlants = ({ result,pagination,onPageChange,setResult,setPagination }
       image: p.image_url || 'https://via.placeholder.com/400x500?text=No+Image',
       tags: [p.is_pet_safe && 'Pet-friendly', p.size, p.care_level].filter(Boolean),
       shipping: 'Ships in 2-4 business days',
-      badge: p.maintenance === 'Low Maintenance' ? 'Easy Care' : null,
+      badge: p.maintenance === 'Low Maintenance' ? 'Easy Care' : p.maintenance === 'Moderate' ? 'Moderate Care' : "Advanced Care",
     })
 
-    // If parent gave filtered results
     if (result !== null && result !== undefined && pagination?.pages === page) {
       setProductData(result.map(mapPlant))
       setLoading(false)
@@ -32,7 +36,6 @@ const IndoorPlants = ({ result,pagination,onPageChange,setResult,setPagination }
       return
     }
 
-    // Otherwise fetch all plants
     const fetchPlants = async () => {
       try {
         setLoading(true)
@@ -44,12 +47,12 @@ const IndoorPlants = ({ result,pagination,onPageChange,setResult,setPagination }
         const data = await res.json()
         setProductData(data.items.map(mapPlant))
         setPagination({
-          total:data.total,
-          page:data.page,
-          limit:data.limit,
-          pages:data.pages,
-          has_next:data.has_next,
-          has_prev:data.has_prev,
+          total: data.total,
+          page: data.page,
+          limit: data.limit,
+          pages: data.pages,
+          has_next: data.has_next,
+          has_prev: data.has_prev,
         })
       } catch (err) {
         console.error('Failed to load plants:', err)
@@ -60,7 +63,27 @@ const IndoorPlants = ({ result,pagination,onPageChange,setResult,setPagination }
     }
 
     fetchPlants()
-  }, [page,result])
+  }, [page, result])
+
+  useEffect(()=>{
+    const fetchWishlist=async()=>{
+      const res=await fetch("http://127.0.0.1:8000/api/wishlist",{
+        headers:{
+          Authorization:`Bearer ${token}`
+        }
+      })
+
+      const data=await res.json();
+
+
+      setWishlist(data);
+
+      
+      
+    }
+    fetchWishlist();
+  },[])
+
 
   if (loading) {
     return (
@@ -80,22 +103,76 @@ const IndoorPlants = ({ result,pagination,onPageChange,setResult,setPagination }
     )
   }
 
-  
+
 
   const goToPage = (newPage) => {
-  const target = Number(newPage)
+    const target = Number(newPage)
 
-  console.log('🖱️ goToPage:', { from: page, to: target })
+    console.log('🖱️ goToPage:', { from: page, to: target })
 
-  if (!Number.isInteger(target)) return
-  if (target < 1) return
-  if (target === page) return                  // same page → skip
-  if (pagination && target > pagination.pages) return
+    if (!Number.isInteger(target)) return
+    if (target < 1) return
+    if (target === page) return                  // same page → skip
+    if (pagination && target > pagination.pages) return
 
-  setPage(target)
-  onPageChange?.(target)
-}
-console.log(pagination?.pages);
+    setPage(target)
+    onPageChange?.(target)
+  }
+  console.log(pagination?.pages);
+
+  const toggleWishlist = async (plantId) => {
+
+    const isWishlisted = wishlist.some((item)=>
+    Number(item.plant_id) === Number(plantId)
+)
+    const res = await fetch(isWishlisted ? `http://127.0.0.1:8000/api/wishlist/${plantId}` : "http://127.0.0.1:8000/api/wishlist/",
+      {
+        method: isWishlisted ? 'DELETE' : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        ...(
+          isWishlisted ? {}
+            :
+            {
+              body: JSON.stringify(
+                {
+                  plant_id: plantId
+                }
+              )
+            }
+        )
+      })
+    const data = await res.json();
+
+    const wishlistRes = await fetch(
+      "http://127.0.0.1:8000/api/wishlist/",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const wishlistData = await wishlistRes.json();
+
+
+    setWishlist(wishlistData);
+
+
+
+    if (res.ok) {
+      toast.success(data.message)
+    } else if (!res.ok) {
+      toast.error(
+        typeof data.detail === "string"
+          ? data.detail
+          : JSON.stringify(data.detail)
+      );
+
+    }
+  }
 
   return (
     <div className="flex-1 min-w-0">
@@ -133,8 +210,13 @@ console.log(pagination?.pages);
                 </span>
               )}
               <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <button className="bg-white p-1.5 rounded-full shadow-sm hover:bg-gray-100 text-gray-700 transition-colors">
-                  <Heart size={14} />
+                <button onClick={() => toggleWishlist(product.id)} className="bg-white p-1.5 rounded-full shadow-sm hover:bg-gray-100 text-gray-700 transition-colors">
+                  <Heart
+                    size={14}
+                    fill={wishlist.some((item)=> item.plant_id === product.id) ? "#e11d48" : "none"}
+                    color={wishlist.some((item)=> item.plant_id=== product.id) ? "#e11d48" : "currentColor"}
+                  />
+
                 </button>
                 <button className="bg-white p-1.5 rounded-full shadow-sm hover:bg-gray-100 text-gray-700 transition-colors">
                   <Eye size={14} />
@@ -189,25 +271,22 @@ console.log(pagination?.pages);
         <div className="flex items-center gap-4 text-sm">
           <span className="text-gray-500">  Page {Math.min(page, pagination?.pages ?? 1)} of {pagination?.pages ?? 1}</span>
           <div className="flex gap-2">
-            <button 
-            onClick={()=>goToPage(page - 1)}
-            disabled={page < 1}
-            className={`px-4 py-2 border 
-            ${
-              page > 1  ? 'border-gray-300 bg-green-400 hover:bg-gray-50 text-black'
-              : 'border-gray-200 text-gray-400 cursor-not-allowed'
-            } rounded-md text-gray-400 font-medium text-xs`}>
+            <button
+              onClick={() => goToPage(page - 1)}
+              disabled={page < 1}
+              className={`px-4 py-2 border 
+            ${page > 1 ? 'border-gray-300 bg-green-400 hover:bg-gray-50 text-black'
+                  : 'border-gray-200 text-gray-400 cursor-not-allowed'
+                } rounded-md text-gray-400 font-medium text-xs`}>
               Prev
             </button>
-            <button 
-            onClick={()=>goToPage(page+1)}
-            disabled={page >= (pagination?.pages ?? 1)}
-            className={`px-4 py-2rounded-md 
-            ${
-              
-              page < (pagination?.pages ?? 1) ? 'bg-black text-white hover:bg-gray-800'
-              : 'bg-gray-300 text-white cursor-not-allowed'
-            }
+            <button
+              onClick={() => goToPage(page + 1)}
+              disabled={page >= (pagination?.pages ?? 1)}
+              className={`px-4 py-2rounded-md 
+            ${page < (pagination?.pages ?? 1) ? 'bg-black text-white hover:bg-gray-800'
+                  : 'bg-gray-300 text-white cursor-not-allowed'
+                }
              transition-colors font-medium text-xs`}>
               Next
             </button>

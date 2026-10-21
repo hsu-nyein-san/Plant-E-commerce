@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Depends , HTTPException, status ,UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, Text,DateTime, ForeignKey,func,desc, or_
-from sqlalchemy.orm import sessionmaker, declarative_base, Session ,relationship
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, Text,DateTime, ForeignKey,func,desc,UniqueConstraint, or_
+from sqlalchemy.orm import sessionmaker, declarative_base, Session ,relationship,joinedload
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel,EmailStr, Field, field_validator , ConfigDict
 from datetime import datetime,timedelta
 from typing import List, Optional, Union
@@ -53,11 +54,27 @@ class Plant(Base):
     category = Column(String(50))            
     description = Column(Text)
 
-    # Detail page
     sku = Column(String(50))
     dimensions = Column(String(100))
     origin = Column(String(100))
     care_instructions = Column(Text)
+
+class WishList(Base):
+    __tablename__ ="wishlist"
+    __table_args__ =(
+        UniqueConstraint(
+            "user_id",
+            "plant_id",
+            name="uq_wishlist_user_plant"
+        ),
+    )
+    id=Column(Integer,primary_key=True,index = True)
+    user_id=Column(Integer,ForeignKey("users.id",ondelete="CASCADE"),nullable=False,index=True)
+    plant_id=Column(Integer,ForeignKey("plants.id",ondelete="CASCADE"),nullable=False,index=True)
+    created_at = Column(DateTime, default=datetime.utcnow) 
+
+    user=relationship("User")
+    plant=relationship("Plant")
 
 
 class Order(Base):
@@ -238,6 +255,19 @@ class SelectionCreate(BaseModel):
     desired_size: str
     style_preference: str
 
+class WishlistItemCreate(BaseModel):
+    plant_id:int
+
+
+class WishlistItemResponse(BaseModel):
+    id: int
+    plant_id: int
+    created_at: datetime
+    plant: PlantResponse
+
+    class Config:
+        from_attributes=True
+
 
 class PlantFilterRequest(BaseModel):
     room_light: Optional[str] = None
@@ -341,12 +371,14 @@ app.mount("/uploads",StaticFiles(directory=str(UPLOAD_DIR)),name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 def get_db():
     db = SessionLocal()
@@ -537,6 +569,102 @@ def get_plant(plant_id: int, db: Session = Depends(get_db)):
 def read_root():
     return {"message": "Welcome to Leafly API"}
 
+
+@app.post("/api/wishlist",status_code=status.HTTP_201_CREATED)
+def add_to_wishlist(data:WishlistItemCreate,db:Session=Depends(get_db),current_user:User=Depends(get_current_user)):
+    plant=db.query(Plant).filter(
+        Plant.id == data.plant_id
+    ).first()
+
+    if plant is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Plant not found"
+        )
+
+    existing=db.query(WishList).filter(
+        WishList.user_id == current_user.id,
+        WishList.plant_id == data.plant_id
+    ).first()
+
+    # if existing:
+    #     raise HTTPException(
+    #         status_code=409,
+    #         detail="Plant is already in your wishlist"
+    #     )
+
+    item=WishList(
+        user_id=current_user.id,
+        plant_id=data.plant_id
+    )
+
+    db.add(item)
+
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Plant is already in your wishlist",
+        )
+
+    return {
+        "message": "Plant added to wishlist"
+    }
+
+
+
+@app.get("/api/wishlist",response_model=List[WishlistItemResponse])
+def get_wishlist(db:Session=Depends(get_db),current_user:User=Depends(get_current_user)):
+        return (
+        db.query(WishList)
+        .options(joinedload(WishList.plant))
+        .filter(WishList.user_id == current_user.id)
+        .order_by(desc(WishList.created_at))
+        .all()
+    )
+
+@app.delete("/api/wishlist/{plant_id}")
+def remove_from_wishlist(
+    plant_id:int,
+    db:Session=Depends(get_db),
+    current_user:User=Depends(get_current_user)
+):
+    item=db.query(WishList).filter(
+        WishList.user_id== current_user.id,
+        WishList.plant_id == plant_id
+    ).first()
+
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Wishlist item not found"
+        )
+
+    db.delete(item)
+    db.commit()
+
+    return {
+        "message": "Plant removed from wishlist"
+    }
+
+@app.delete("/api/wishlist")
+def remove_all_from_wishlist(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    deleted_count = db.query(WishList).filter(
+        WishList.user_id == current_user.id
+    ).delete(synchronize_session=False)
+
+    db.commit()
+
+    return {
+        "message": "Wishlist cleared",
+        "deleted_count": deleted_count
+    }
 
 @app.post("/api/auth/signup", response_model=TokenResponse, status_code=201)
 def signup(payload: UserSignup, db: Session = Depends(get_db)):

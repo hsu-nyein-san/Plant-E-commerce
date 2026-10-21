@@ -7,8 +7,7 @@ import ShippingEstimator from '../components/ShippingEstimator';
 import OrderSummary from '../components/OrderSummary';
 
 const CartPage = () => {
-  // 1. Try to load cart from localStorage first, otherwise use default items
-  // const defaultItems=localStorage.getItem('leafly_cart')
+   const defaultItems=[]
 
   
 
@@ -17,7 +16,6 @@ const CartPage = () => {
     return saved ? JSON.parse(saved) : defaultItems;
   });
 
-  // 2. Save to localStorage whenever items change
   useEffect(() => {
     localStorage.setItem('leafly_cart', JSON.stringify(items));
   }, [items]);

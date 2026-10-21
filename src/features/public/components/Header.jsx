@@ -1,9 +1,30 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import Container from '../../../components/Container';
 import { Link } from 'react-router-dom';
+import useCookie from "react-use-cookie";
+import Button from '../../../components/Button';
+
 
 const Header = () => {
+  const [user] = useCookie("user");
+  const [token] = useCookie("token");
+  const [photo, setPhoto] = useState();
+
+  useEffect(() => {
+    const fetchImage = async () => {
+      const res = await fetch("http://127.0.0.1:8000/api/auth/me", {
+        headers: {
+          Authorization: `Bearer ${token.trim()}`
+        }
+      })
+      const data = await res.json();
+
+      setPhoto(data.profile_image)
+
+    };
+    fetchImage();
+  }, [])
   return (
     <Container>
       <header className="border-b border-gray-100 bg-white sticky top-0 z-50">
@@ -34,11 +55,21 @@ const Header = () => {
                 Plant Finder
               </Link>
               <Link
-                to="cart"
+                to="/cart"
                 className="text-sm text-gray-600 hover:text-black transition-colors"
               >
                 Cart
               </Link>
+              {
+                user && (
+                  <Link
+                    to="wishlist"
+                    className="text-sm text-gray-600 hover:text-black transition-colors"
+                  >
+                    Wishlist
+                  </Link>
+                )
+              }
             </nav>
           </div>
 
@@ -52,10 +83,21 @@ const Header = () => {
                 className="pl-9 pr-4 py-2 bg-[#f4f4f5] border border-transparent rounded-md text-sm text-gray-700 placeholder-gray-400 outline-none focus:border-border-light focus:ring-1 focus:ring-border w-[260px] transition-all"
               />
             </div>
-
-            <button className="bg-black text-white px-5 py-[7px] rounded-md text-sm font-medium hover:bg-gray-800 transition-colors">
-              Sign in
-            </button>
+            {
+              user.length === 0 ? (
+                <link to="/login">
+                  <Button variant="dark" text="Sign in" />
+                </link>
+              ) : (
+                <Link to="/user-profile">
+                  <div className="w-9 h-9">
+                    <img src={
+                      photo ? `http://127.0.0.1:8000${photo}` : `https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png`
+                    } alt="" className=" rounded-full" />
+                  </div>
+                </Link>
+              )
+            }
           </div>
 
         </div>

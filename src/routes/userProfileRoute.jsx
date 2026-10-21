@@ -7,12 +7,6 @@ const UserProfilePage = lazy(() =>
 const PasswordChangePage = lazy(() =>
   import("../features/user-profile/pages/PasswordChangePage")
 );
-const ProfileNameChangePage = lazy(() =>
-  import("../features/user-profile/pages/ProfileNameChangePage")
-);
-const ProfileImageChangePage = lazy(() =>
-  import("../features/user-profile/pages/ProfileImageChangePage")
-);
 
 const userProfileRoute = [
   {
@@ -31,14 +25,8 @@ const userProfileRoute = [
     path: "user-profile/edit-profile",
     element: <EditProfilePage />,
   },
-  {
-    path: "user-profile/change-name",
-    element: <ProfileNameChangePage />,
-  },
-  {
-    path: "user-profile/change-photo",
-    element: <ProfileImageChangePage />,
-  },
+ 
+  
 ];
 
 export default userProfileRoute;

@@ -20,13 +20,13 @@ export default {
           200: "#bbf7d0",
           300: "#86efac",
           400: "#4ade80",
-          500: "#2B7A4B", // ✅ Base / Primary Green
-          600: "#23613C", // ✅ Hover state (darker shade)
+          500: "#2B7A4B", //  Base / Primary Green
+          600: "#23613C", // Hover state (darker shade)
           700: "#1B4A2D",
           800: "#13331F",
           900: "#0A1C11",
-          DEFAULT: "#2B7A4B", // ✅ Primary Green
-          hover: "#23613C",   // ✅ Hover Green
+          DEFAULT: "#2B7A4B", // Primary Green
+          hover: "#23613C",   // Hover Green
         },
         surface: {
           DEFAULT: "#F7F4EF", // Main page background (warm off-white)
@@ -46,7 +46,7 @@ export default {
         border: {
           DEFAULT: "#E5E7EB", // Standard borders (gray-200)
           light: "#F3F4F6",   // Very subtle borders
-          focus: "#2B7A4B",   // ✅ Focus ring matches brand
+          focus: "#2B7A4B",   // Focus ring matches brand
         },
 
         // --- Semantic / Status ---

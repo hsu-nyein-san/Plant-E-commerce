@@ -34,7 +34,9 @@ console.log("type:", typeof user);
           }
           {
             user.length !== 0 && (<>
+          <Link to="/wishlist">
             <button className="hover:text-gray-900">Wishlist</button>
+          </Link>
           <button className="relative hover:text-gray-900">
             <ShoppingCart size={20} />
             <span className="absolute -top-2 -right-2 bg-green-700 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">1</span>

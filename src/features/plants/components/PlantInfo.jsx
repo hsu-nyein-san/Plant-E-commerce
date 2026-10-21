@@ -2,14 +2,18 @@ import { ChevronRight, Heart, Truck } from 'lucide-react';
 import React, { createContext, useEffect, useMemo, useState } from 'react';
 import BreadCrumb from '../../../components/BreadCrumb';
 import { data } from 'autoprefixer';
+import useCookie from 'react-use-cookie';
+import toast from 'react-hot-toast';
 
 const STORAGE_KEY = 'leafly_cart'
 const PlantInfo = ({productId}) => {
 
     const [plantInfo,setPlantInfo]=useState([]);
     const [loading,setLoading]=useState(false);
+    const [wishlist,setWishlist]=useState([]);
     const [exitingItem,setExitingItem]=useState(false);
     const CartContext = createContext()
+    const [token]=useCookie("token");
 
 
     const [cart, setCart] = useState(() => {
@@ -17,17 +21,16 @@ const PlantInfo = ({productId}) => {
       const saved = localStorage.getItem(STORAGE_KEY)
       return saved ? JSON.parse(saved) : []
     } catch (err) {
-      console.error('❌ Failed to load cart:', err)
+      console.error('Failed to load cart:', err)
       return []
     }
   })
 
-  // ⭐ Save
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(cart))
     } catch (err) {
-      console.error('❌ Failed to save cart:', err)
+      console.error('Failed to save cart:', err)
     }
   }, [cart])
 
@@ -53,16 +56,26 @@ const PlantInfo = ({productId}) => {
         fetchPlantDetail();
     },[]);
 
+    useEffect(()=>{
+        const fetchWishlist=async()=>{
+            const res=await fetch("http://127.0.0.1:8000/api/wishlist",{
+                headers:{
+                    Authorization:`Bearer ${token}`
+                }
+            })
+            const data=await res.json();
+            setWishlist(data)
+        }
+    fetchWishlist();
+    },[])
+
+
+
 
     const isExitsing = useMemo(
     () => cart.some((item) => item.id === productId),
     [cart, productId]
   )
-
-
-    console.log(isExitsing);
-    
-    
 
     
     const handleCart=(plant)=>{
@@ -79,8 +92,8 @@ const PlantInfo = ({productId}) => {
                 {
                     id:plant.id,
                     name: plant.name,
-          price: plant.price,
-          image: plant.image_url || plant.image,
+                    price: plant.price,
+                    image: plant.image_url || plant.image,
                     quantity:1
                 }
             ])
@@ -91,10 +104,52 @@ const PlantInfo = ({productId}) => {
         
     }
 
+    const isWishList=wishlist.some((item)=> item.plant_id=== productId)
+
+
+    const toggleWishlist=async(productId)=>{
+
+        const res=await fetch( isWishList ? `http://127.0.0.1:8000/api/wishlist/${productId}` : "http://127.0.0.1:8000/api/wishlist",
+            {
+                method:isWishList ? 'DELETE' : 'POST',
+                headers:{
+                    Authorization: `Bearer ${token}`,
+                    "Content-type":"application/json"
+                },
+                ...(
+                    isWishList ? {}
+                    :
+                    {
+                        body:JSON.stringify({
+                            plant_id:productId
+                        })
+                    }
+                )
+            }
+        )
+        const data=await res.json();
+
+        const get_res=await fetch("http://127.0.0.1:8000/api/wishlist",{
+                headers:{
+                    Authorization:`Bearer ${token}`
+                }
+            })
+            const wishlistData=await get_res.json();
+            setWishlist(wishlistData)
+
+        if(res.ok)
+        {
+            toast.success(data.message)
+        }
+        else if(!res.ok)
+        {
+            toast.error(data.message)
+        }
+    }
+
     
     return (
         <div className="flex flex-col gap-6">
-            {/* Breadcrumb & Title */}
             <div>
                 <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
                     
@@ -115,7 +170,6 @@ const PlantInfo = ({productId}) => {
                 </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex flex-col gap-3">
                 <button onClick={()=>handleCart(plantInfo)} className="w-full bg-black text-sm text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors">
                     {
@@ -127,14 +181,18 @@ const PlantInfo = ({productId}) => {
                         <Truck className="w-4 h-4" />
                         Schedule Delivery
                     </button>
-                    <button className="flex-1 border text-sm border-gray-300 py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
-                        <Heart className="w-4 h-4" />
-                        Add to Wishlist
+                    <button onClick={()=>toggleWishlist(productId)} className="flex-1 border text-sm border-gray-300 py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
+                        <Heart className="w-7 h-7" 
+                        fill={isWishList ? "#e11d48" : "none"}
+                    color={isWishList ? "#e11d48" : "currentColor"}
+                        />
+                        {
+                            isWishList ? 'Added' : 'Add'
+                        } to Wishlist
                     </button>
                 </div>
             </div>
 
-            {/* Tags */}
             <div className="flex flex-wrap gap-2">
                 <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded text-xs font-medium">Light: {plantInfo.light_requirement}</span>
                 <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded text-xs font-medium">Size: {plantInfo.size}</span>
@@ -142,7 +200,6 @@ const PlantInfo = ({productId}) => {
                 <span className="bg-amber-50 text-amber-700 px-3 py-1 rounded text-xs font-medium">Care Level: {plantInfo.care_level}</span>
             </div>
 
-            {/* Specs Grid */}
             <div className="grid grid-cols-3 gap-4 py-4 text-sm">
                 <div>
                     <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold">SKU</p>
@@ -158,7 +215,6 @@ const PlantInfo = ({productId}) => {
                 </div>
             </div>
 
-            {/* Info Sections */}
             <div className="space-y-2 text-sm text-gray-600">
                 <div className="border border-gray-200 rounded-lg p-4">
                     <h3 className="font-semibold text-gray-900 mb-2">Description</h3>
