@@ -1,6 +1,9 @@
 import React from 'react'
 import Button from '../../../components/Button'
 import CartItem from './CartItem';
+import banner from "../../../assets/banner.jpeg"
+import { Link } from 'react-router-dom';
+
 
 const YourCartSection = ({items,updateQuantity,removeItem}) => {
     
@@ -13,13 +16,13 @@ const YourCartSection = ({items,updateQuantity,removeItem}) => {
                     <p className="text-sm text-ink-secondary">Review items, apply promo codes, and estimate shipping before checkout.</p>
                 </div>
                 <div className="hidden sm:flex gap-3 pt-4">
-                    <Button text='Continue Shopping' variant='secondary' />
-                    <Button variant='dark' text="Save for later" />
+                    <Link>
+                    <Button variant='dark' text="Continue Shopping" /></Link>
                 </div>
             </div>
             <div className="w-full h-48 bg-gray-100 rounded-lg mb-8 overflow-hidden relative">
                <img 
-                 src="https://images.unsplash.com/photo-1466781783364-36c955e42a77?auto=format&fit=crop&q=80&w=1000" 
+                 src={banner}
                  alt="Plants banner" 
                  className="w-full h-full object-cover"
                />

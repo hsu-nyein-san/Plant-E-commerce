@@ -31,6 +31,7 @@ const PlantInfo = ({ productId }) => {
     useEffect(() => {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(cart))
+            window.dispatchEvent(new Event("cartUpdated"));
         } catch (err) {
             console.error('Failed to save cart:', err)
         }

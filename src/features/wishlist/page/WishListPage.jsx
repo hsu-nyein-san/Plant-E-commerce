@@ -30,6 +30,7 @@ const WishListPage = () => {
 
   useEffect(() => {
     localStorage.setItem('leafly_cart', JSON.stringify(cart));
+    window.dispatchEvent(new Event("cartUpdated"));
   }, [cart])
 
   useEffect(() => {

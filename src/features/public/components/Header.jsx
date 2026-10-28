@@ -18,9 +18,24 @@ const Header = () => {
 
   const isLoggedIn = Boolean(user && token);
 
+  const [cartItem, setCartItem] = useState(() => {
   const cart = localStorage.getItem("leafly_cart");
+  return cart ? JSON.parse(cart) : [];
+});
 
-  const cartItem = cart ? JSON.parse(cart) : [];
+useEffect(() => {
+  const updateCart = () => {
+    const saved = localStorage.getItem("leafly_cart");
+    setCartItem(saved ? JSON.parse(saved) : []);
+  };
+
+  window.addEventListener("cartUpdated", updateCart);
+
+  return () => {
+    window.removeEventListener("cartUpdated", updateCart);
+  };
+}, []);
+
   useEffect(() => {
     const fetchImage = async () => {
       try {
@@ -98,11 +113,11 @@ const Header = () => {
             >
               <ShoppingCart size={21} strokeWidth={1.7} />
 
-              {cartItem.length > 0 && (
+              
                 <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#2B7A4B] px-[0.6px] text-xs text-white">
                   {cartItem.length}
                 </span>
-              )}
+              
             </Link>
 
             {isLoggedIn && (

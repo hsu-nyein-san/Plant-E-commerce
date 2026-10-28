@@ -18,13 +18,37 @@ const CartPage = () => {
 
   useEffect(() => {
     localStorage.setItem('leafly_cart', JSON.stringify(items));
+    window.dispatchEvent(new Event("cartUpdated"));
   }, [items]);
 
   const updateQuantity = (id, delta) => {
-    setItems(items.map(item => item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item));
-  }
+  setItems((prevItems) => {
+    const updatedItems = prevItems.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            quantity: Math.max(1, item.quantity + delta),
+          }
+        : item
+    );
 
-  const removeItem = (id) => setItems(items.filter(item => item.id !== id));
+    localStorage.setItem("leafly_cart", JSON.stringify(updatedItems));
+    window.dispatchEvent(new Event("cartUpdated"));
+
+    return updatedItems;
+  });
+};
+
+const removeItem = (id) => {
+  setItems((prevItems) => {
+    const updatedItems = prevItems.filter((item) => item.id !== id);
+
+    localStorage.setItem("leafly_cart", JSON.stringify(updatedItems));
+    window.dispatchEvent(new Event("cartUpdated"));
+
+    return updatedItems;
+  });
+};
 
   const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const discount = subtotal > 0 ? 24.00 : 0;

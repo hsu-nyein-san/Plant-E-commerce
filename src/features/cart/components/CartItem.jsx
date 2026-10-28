@@ -8,7 +8,6 @@ const CartItem = ({ item, updateQuantity, removeItem }) => {
         <img src={item.image} alt={item.name} className="w-full h-full object-cover mix-blend-multiply" />
       </div>
 
-      {/* Details */}
       <div className="flex-1 flex flex-col justify-between">
         <div>
           <div className="flex justify-between items-start">
