@@ -121,7 +121,7 @@ const Header = () => {
               <PlantSearch />
             </div>
 
-=            <button
+            <button
               type="button"
               onClick={() => setMobileSearchOpen((v) => !v)}
               className={`${iconLinkClass} sm:hidden`}
