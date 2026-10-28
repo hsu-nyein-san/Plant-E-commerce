@@ -1,8 +1,9 @@
 import React from 'react'
 import OrderItem from './OrderItem'
 import SectionHeader from './SectionHeader'
+import useCookie from 'react-use-cookie';
+import toast from 'react-hot-toast';
 
-// 👇 Default value protects against undefined
 const Review_PlaceOrderSection = ({ items = [] ,shippingData={} ,paymentData={} ,onBack,onPlaceOrder,setOrder }) => {
   const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const discount = subtotal > 0 ? 24.00 : 0;
@@ -10,10 +11,15 @@ const Review_PlaceOrderSection = ({ items = [] ,shippingData={} ,paymentData={} 
   const tax = 10.00;
   const total = subtotal - discount + shipping + tax;
 
+  const [token]=useCookie("token");
+
+  console.log(items);
   
 
   const handlePlaceOrder=async ()=>{
-    try {
+    if (token)
+    {
+      try {
       const payload = {
       user_email: shippingData.email,
       shipping_name: shippingData.fullName,
@@ -29,6 +35,8 @@ const Review_PlaceOrderSection = ({ items = [] ,shippingData={} ,paymentData={} 
       items: items.map((item) => ({
         plant_id: item.id,
         plant_name: item.name,
+        image_url:item.image,
+        category:item.category,
         price: item.price,
         quantity: item.quantity,
       })),
@@ -36,7 +44,10 @@ const Review_PlaceOrderSection = ({ items = [] ,shippingData={} ,paymentData={} 
 
     const res=await fetch(`http://127.0.0.1:8000/api/orders/`,{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+        'Content-Type':'application/json',
+        Authorization:`Bearer ${token}`
+      },
       body:JSON.stringify(payload),
     })
 
@@ -48,11 +59,44 @@ const Review_PlaceOrderSection = ({ items = [] ,shippingData={} ,paymentData={} 
     const order=await res.json();
 
     localStorage.removeItem('leafly_cart')
+
+    console.log(localStorage.getItem("checkout_draft"));
+    
+    if(localStorage.getItem("checkout_draft") != null)
+    {
+      localStorage.removeItem("checkout_draft")
+      toast.success("delete local storage")
+      
+    }
+    else
+    {
+      const res2=await fetch('http://127.0.0.1:8000/api/checkout-draft',
+      {
+        method:'DELETE',
+        headers:{
+          Authorization : `Bearer ${token}`,
+        }
+      }
+    )
+
+    const result=await res2.json();
+
+    if(res2.ok)
+    {
+      toast.success(result.message)
+    }
+    }
+
+    
+
+
     onPlaceOrder();
     setOrder(order)
 
     } catch (error) {
+      console.log(error.message);
       
+    }
     }
   }
 

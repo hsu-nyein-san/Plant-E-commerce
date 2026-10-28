@@ -1,7 +1,7 @@
 import { ChevronDown, Eye, Heart, X } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import useCookie from 'react-use-cookie'
 
 const IndoorPlants = ({ result, pagination, onPageChange, setResult, setPagination }) => {
@@ -11,6 +11,7 @@ const IndoorPlants = ({ result, pagination, onPageChange, setResult, setPaginati
   const [error, setError] = useState(null)
   const [page, setPage] = useState(1)
   const LIMIT = 6;
+  const navigate=useNavigate();
 
   const [token] = useCookie("token")
 
@@ -81,7 +82,10 @@ const IndoorPlants = ({ result, pagination, onPageChange, setResult, setPaginati
       
       
     }
+   if(token)
+   {
     fetchWishlist();
+   }
   },[])
 
 
@@ -122,7 +126,9 @@ const IndoorPlants = ({ result, pagination, onPageChange, setResult, setPaginati
 
   const toggleWishlist = async (plantId) => {
 
-    const isWishlisted = wishlist.some((item)=>
+    if(token)
+    {
+      const isWishlisted = wishlist.some((item)=>
     Number(item.plant_id) === Number(plantId)
 )
     const res = await fetch(isWishlisted ? `http://127.0.0.1:8000/api/wishlist/${plantId}` : "http://127.0.0.1:8000/api/wishlist/",
@@ -172,6 +178,10 @@ const IndoorPlants = ({ result, pagination, onPageChange, setResult, setPaginati
       );
 
     }
+    }
+    else {
+      navigate("/login")
+    }
   }
 
   return (
@@ -218,9 +228,10 @@ const IndoorPlants = ({ result, pagination, onPageChange, setResult, setPaginati
                   />
 
                 </button>
+                <Link to={`/house-plants/${product.id}`}>
                 <button className="bg-white p-1.5 rounded-full shadow-sm hover:bg-gray-100 text-gray-700 transition-colors">
                   <Eye size={14} />
-                </button>
+                </button></Link>
               </div>
               <div className="absolute bottom-0 left-0 right-0 p-3 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 translate-y-2 group-hover:translate-y-0 bg-gradient-to-t from-black/20 to-transparent">
                 <span className="text-[10px] font-medium text-gray-800 bg-white/90 backdrop-blur-sm px-2 py-1 rounded shadow-sm">

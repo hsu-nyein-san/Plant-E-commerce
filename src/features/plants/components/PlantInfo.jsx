@@ -4,159 +4,166 @@ import BreadCrumb from '../../../components/BreadCrumb';
 import { data } from 'autoprefixer';
 import useCookie from 'react-use-cookie';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 const STORAGE_KEY = 'leafly_cart'
-const PlantInfo = ({productId}) => {
+const PlantInfo = ({ productId }) => {
 
-    const [plantInfo,setPlantInfo]=useState([]);
-    const [loading,setLoading]=useState(false);
-    const [wishlist,setWishlist]=useState([]);
-    const [exitingItem,setExitingItem]=useState(false);
+    const [plantInfo, setPlantInfo] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [wishlist, setWishlist] = useState([]);
+    const [exitingItem, setExitingItem] = useState(false);
     const CartContext = createContext()
-    const [token]=useCookie("token");
+    const [token] = useCookie("token");
+    const navigate = useNavigate();
 
 
     const [cart, setCart] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      return saved ? JSON.parse(saved) : []
-    } catch (err) {
-      console.error('Failed to load cart:', err)
-      return []
-    }
-  })
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY)
+            return saved ? JSON.parse(saved) : []
+        } catch (err) {
+            console.error('Failed to load cart:', err)
+            return []
+        }
+    })
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cart))
-    } catch (err) {
-      console.error('Failed to save cart:', err)
-    }
-  }, [cart])
+    useEffect(() => {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(cart))
+        } catch (err) {
+            console.error('Failed to save cart:', err)
+        }
+    }, [cart])
 
 
-    useEffect(()=>{
-        const fetchPlantDetail=async () =>{
+    useEffect(() => {
+        const fetchPlantDetail = async () => {
 
             try {
                 setLoading(true);
-                const res=await fetch(`http://127.0.0.1:8000/api/plants/${productId}`);
+                const res = await fetch(`http://127.0.0.1:8000/api/plants/${productId}`);
                 if (!res.ok) throw new Error(`Http ${res.status}`);
-                const data =await res.json();
-                
+                const data = await res.json();
+
                 setPlantInfo(data);
             } catch (error) {
                 console.error(error);
                 setError(err.message);
 
-            }finally {
+            } finally {
                 setLoading(false);
             }
         }
         fetchPlantDetail();
-    },[]);
+    }, []);
 
-    useEffect(()=>{
-        const fetchWishlist=async()=>{
-            const res=await fetch("http://127.0.0.1:8000/api/wishlist",{
-                headers:{
-                    Authorization:`Bearer ${token}`
+    useEffect(() => {
+        const fetchWishlist = async () => {
+            const res = await fetch("http://127.0.0.1:8000/api/wishlist", {
+                headers: {
+                    Authorization: `Bearer ${token}`
                 }
             })
-            const data=await res.json();
+            const data = await res.json();
             setWishlist(data)
         }
-    fetchWishlist();
-    },[])
+        if (token) {
+            fetchWishlist();
+        }
+    }, [])
 
 
 
 
     const isExitsing = useMemo(
-    () => cart.some((item) => item.id === productId),
-    [cart, productId]
-  )
+        () => cart.some((item) => item.id === productId),
+        [cart, productId]
+    )
 
-    
-    const handleCart=(plant)=>{
-        
-        const isInCart=cart.some((item)=>item.id === plant.id)
 
-        if(isInCart)
-        {
-            setCart((prev)=>prev.filter((item)=>item.id !== plant.id))
+    const handleCart = (plant) => {
+
+        const isInCart = cart.some((item) => item.id === plant.id)
+
+        if (isInCart) {
+            setCart((prev) => prev.filter((item) => item.id !== plant.id))
         }
-        else{
-            setCart((prev)=>[
+        else {
+            setCart((prev) => [
                 ...prev,
                 {
-                    id:plant.id,
+                    id: plant.id,
                     name: plant.name,
                     price: plant.price,
                     image: plant.image_url || plant.image,
-                    quantity:1
+                    category:plant.category,
+                    quantity: 1
                 }
             ])
         }
-        
-        
-        setExitingItem(isInCart) 
-        
+
+
+        setExitingItem(isInCart)
+
     }
 
-    const isWishList=wishlist.some((item)=> item.plant_id=== productId)
+    const isWishList = wishlist.some((item) => item.plant_id === productId)
 
 
-    const toggleWishlist=async(productId)=>{
+    const toggleWishlist = async (productId) => {
 
-        const res=await fetch( isWishList ? `http://127.0.0.1:8000/api/wishlist/${productId}` : "http://127.0.0.1:8000/api/wishlist",
-            {
-                method:isWishList ? 'DELETE' : 'POST',
-                headers:{
-                    Authorization: `Bearer ${token}`,
-                    "Content-type":"application/json"
-                },
-                ...(
-                    isWishList ? {}
-                    :
-                    {
-                        body:JSON.stringify({
-                            plant_id:productId
-                        })
-                    }
-                )
-            }
-        )
-        const data=await res.json();
+        if (token) {
+            const res = await fetch(isWishList ? `http://127.0.0.1:8000/api/wishlist/${productId}` : "http://127.0.0.1:8000/api/wishlist",
+                {
+                    method: isWishList ? 'DELETE' : 'POST',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-type": "application/json"
+                    },
+                    ...(
+                        isWishList ? {}
+                            :
+                            {
+                                body: JSON.stringify({
+                                    plant_id: productId
+                                })
+                            }
+                    )
+                }
+            )
+            const data = await res.json();
 
-        const get_res=await fetch("http://127.0.0.1:8000/api/wishlist",{
-                headers:{
-                    Authorization:`Bearer ${token}`
+            const get_res = await fetch("http://127.0.0.1:8000/api/wishlist", {
+                headers: {
+                    Authorization: `Bearer ${token}`
                 }
             })
-            const wishlistData=await get_res.json();
+            const wishlistData = await get_res.json();
             setWishlist(wishlistData)
 
-        if(res.ok)
-        {
-            toast.success(data.message)
+            if (res.ok) {
+                toast.success(data.message)
+            }
+            else if (!res.ok) {
+                toast.error(data.message)
+            }
         }
-        else if(!res.ok)
-        {
-            toast.error(data.message)
+        else {
+            navigate("/login")
         }
     }
 
-    
+
     return (
         <div className="flex flex-col gap-6">
             <div>
                 <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-                    
+
                     <BreadCrumb
-          currentPageTitle={"Houseplants"}
-          links={[{ title: "shop", path: "/shop" }]}
-        />
+                        currentPageTitle={"Houseplants"}
+                        links={[{ title: "shop", path: "/shop" }]}
+                    />
                 </div>
                 <h1 className="text-3xl font-bold text-gray-900">{plantInfo.name}</h1>
                 <p className="text-gray-500 text-sm mt-1">Botanical name: {plantInfo.subtitle}</p>
@@ -171,7 +178,7 @@ const PlantInfo = ({productId}) => {
             </div>
 
             <div className="flex flex-col gap-3">
-                <button onClick={()=>handleCart(plantInfo)} className="w-full bg-black text-sm text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors">
+                <button onClick={() => handleCart(plantInfo)} className="w-full bg-black text-sm text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors">
                     {
                         isExitsing ? 'Added' : 'Add'
                     } to Cart
@@ -181,10 +188,10 @@ const PlantInfo = ({productId}) => {
                         <Truck className="w-4 h-4" />
                         Schedule Delivery
                     </button>
-                    <button onClick={()=>toggleWishlist(productId)} className="flex-1 border text-sm border-gray-300 py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
-                        <Heart className="w-7 h-7" 
-                        fill={isWishList ? "#e11d48" : "none"}
-                    color={isWishList ? "#e11d48" : "currentColor"}
+                    <button onClick={() => toggleWishlist(productId)} className="flex-1 border text-sm border-gray-300 py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
+                        <Heart className="w-7 h-7"
+                            fill={isWishList ? "#e11d48" : "none"}
+                            color={isWishList ? "#e11d48" : "currentColor"}
                         />
                         {
                             isWishList ? 'Added' : 'Add'
@@ -226,9 +233,9 @@ const PlantInfo = ({productId}) => {
                 <div className="border border-gray-200 rounded-lg p-4">
                     <h3 className="font-semibold text-gray-900 mb-2">Care Instructions</h3>
                     <ul className="list-disc pl-5 space-y-1 leading-relaxed">
-                        {plantInfo.care_instructions?.split('\n').map((instruction,index)=>{
-                            const [label,...rest]=instruction.split(':');
-                            return(
+                        {plantInfo.care_instructions?.split('\n').map((instruction, index) => {
+                            const [label, ...rest] = instruction.split(':');
+                            return (
                                 <li key={index}><strong>{label}:</strong> {rest.join(':')}</li>
                             )
                         })

@@ -6,6 +6,7 @@ import CartPage from "../features/cart/pages/CartPage";
 import CheckoutPage from "../features/checkout/pages/CheckoutPage";
 import OrderPage from "../features/order/page/OrderPage";
 import WishListPage from "../features/wishlist/page/WishListPage";
+import OrderDetailPage from "../features/order/page/OrderDetailPage";
 
 const AboutUsPage = lazy(() => import("../features/public/pages/AboutUsPage"));
 const ContactUsPage = lazy(() => import("../features/public/pages/ContactUsPage"));
@@ -41,8 +42,12 @@ const publicRoute = [
     element: <ContactUsPage />,
   },
   {
-    path:"my-order",
+    path:"my-orders",
     element:<OrderPage/>,
+  },
+  {
+    path:"my-orders/:id",
+    element:<OrderDetailPage/>,
   },
   {
     path:"wishlist",

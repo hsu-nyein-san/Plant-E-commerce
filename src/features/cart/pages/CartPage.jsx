@@ -10,7 +10,7 @@ const CartPage = () => {
    const defaultItems=[]
 
   
-
+  const [promoCode,setPromoCode]=useState("");
   const [items, setItems] = useState(() => {
     const saved = localStorage.getItem('leafly_cart');
     return saved ? JSON.parse(saved) : defaultItems;
@@ -28,7 +28,7 @@ const CartPage = () => {
 
   const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const discount = subtotal > 0 ? 24.00 : 0;
-  const tax = 10.00;
+  const tax = 5.00;
 
   return (
     <Container>
@@ -36,12 +36,12 @@ const CartPage = () => {
             <div className="col-span-6">
                 <YourCartSection items={items} updateQuantity={updateQuantity} removeItem={removeItem}/>
                 <div className="grid lg:grid-cols-2 gap-4">
-                    <div className="col-span-1"><PromoCode /></div>
+                    <div className="col-span-1"><PromoCode setPromoCode={setPromoCode}/></div>
                     <div className="col-span-1"><ShippingEstimator/></div>
                 </div>
             </div>
             <div className="col-span-5">
-                <OrderSummary subtotal={subtotal} discount={discount} tax={tax} cartItems={items} />
+                <OrderSummary subtotal={subtotal} discount={discount} tax={tax} cartItems={items} promoCode={promoCode}/>
             </div>
         </div>
     </Container>

@@ -1,10 +1,19 @@
 import { Lock } from 'lucide-react'
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import useCookie from 'react-use-cookie';
 
-const OrderSummary = ({ subtotal, discount = 0, tax = 0, cartItems = [] }) => {
+const OrderSummary = ({ subtotal, discount = 0, tax = 0, cartItems = [] ,promoCode}) => {
+
+  const [token]=useCookie("token");
   const [shippingCost, setShippingCost] = useState(8.00);
-  const finalTotal = subtotal - discount + shippingCost + tax;
+  const finalTotal = subtotal - (promoCode ? discount : 0) + shippingCost + tax;
+  
+const [isGuest, setIsGuest] = useState(false);
+const navigate = useNavigate();
+
+
+  
 
   return (
     <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 sticky top-24">
@@ -17,8 +26,12 @@ const OrderSummary = ({ subtotal, discount = 0, tax = 0, cartItems = [] }) => {
         </div>
         {discount > 0 && (
           <div className="flex justify-between text-green-700">
-            <span>Promo (SPRING20)</span>
-            <span>-${discount.toFixed(2)}</span>
+            {
+              promoCode ? (<div>
+                <span>Promo ({promoCode})</span><span>-${discount.toFixed(2)}</span>
+              </div>) : (<></>)
+            }
+            
           </div>
         )}
 
@@ -67,15 +80,14 @@ const OrderSummary = ({ subtotal, discount = 0, tax = 0, cartItems = [] }) => {
         </div>
       </div>
 
-      {/* Pass cart items to Checkout page */}
-      <Link to="/checkout" state={{ cartItems }}>
+      <Link to={!token ? (isGuest ? `/checkout` : `/login`) : `/checkout`} state={{ cartItems }}>
         <button className="w-full bg-black text-white py-3 rounded-full font-medium hover:bg-gray-800 transition mb-4">
           Proceed to Checkout
         </button>
       </Link>
 
       <div className="flex items-center gap-2 text-xs text-gray-500 justify-center mb-6">
-        <input type="checkbox" id="guest" className="accent-black" />
+        <input type="checkbox" checked={isGuest} onChange={(e) => setIsGuest(e.target.checked)} id="guest" className="accent-black" />
         <label htmlFor="guest">Guest checkout (No account required)</label>
       </div>
 

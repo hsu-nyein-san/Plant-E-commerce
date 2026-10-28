@@ -28,7 +28,6 @@ const CheckoutPage = () => {
     saveAddress: false,
   })
 
-  // ⭐ Payment data
   const [paymentData, setPaymentData] = useState({
     cardNumber: '',
     cardName: '',
@@ -46,6 +45,8 @@ const CheckoutPage = () => {
     return saved ? JSON.parse(saved) : [];
   });
 
+  
+
   const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const discount = subtotal > 0 ? 24.00 : 0;
   const shipping = 8.00;
@@ -53,13 +54,12 @@ const CheckoutPage = () => {
   const total = subtotal - discount + shipping + tax;
 
   const handleShippingNext = (data) => {
-    console.log('📍 Shipping complete:', data)
+    console.log(' Shipping complete:', data)
     setShippingData(data)
     setStep(2)
   }
 
   const handlePaymentNext = (data) => {
-    console.log('📍 Payment complete:', data)
     setPaymentData(data)
     setStep(3)
   }

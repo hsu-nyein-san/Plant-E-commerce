@@ -17,7 +17,7 @@ const Stepper = ({currentStep}) => {
                                 {idx + 1}
                             </div>
                             <span className={`text-sm ${idx === 0 ? 'text-black font-medium' : 'text-gray-400'}`}>
-                                {step}{idx}
+                                {step}
                             </span>
                             {idx < 3 && <div className="w-8 h-[1px] bg-gray-200 hidden md:block ml-2"></div>}
                         </div>

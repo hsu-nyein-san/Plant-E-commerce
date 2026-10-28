@@ -9,7 +9,6 @@ const UserProfilePage = () => {
         <div className="pt-6">
           <BreadCrumb currentPageTitle="My Account" />
         </div>
-
         <UserProfileCard />
       </Container>
     </section>

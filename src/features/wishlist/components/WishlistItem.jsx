@@ -28,7 +28,7 @@ const WishlistItem = ({ plantId ,cart,setCart}) => {
 
 
 
-    const handleAddToCart = (id, name, price, image) => {
+    const handleAddToCart = (id, name, price, image,category) => {
 
         setCart((prev) => {
             const isInCart = prev.some((item) => item.id === id);
@@ -40,10 +40,11 @@ const WishlistItem = ({ plantId ,cart,setCart}) => {
             return [
                 ...prev,
                 {
-                    id,
-                    name,
-                    price,
-                    image,
+                    id : id,
+                    name: name,
+                    price:price,
+                    image:image,
+                    category:category,
                     quantity: 1,
                 },
             ];
@@ -81,7 +82,7 @@ const WishlistItem = ({ plantId ,cart,setCart}) => {
                             <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#91A087]">
                                 {item.subtitle}
                             </p>
-                            <h3 className="font-sans text-2xl transition group-hover:text-[#2B7A4B]">
+                            <h3 className="font-sans text-lg font-bold transition group-hover:text-[#2B7A4B]">
                                 {
                                     item.name
                                 }
@@ -112,7 +113,7 @@ const WishlistItem = ({ plantId ,cart,setCart}) => {
                                     }
                                     icon={ShoppingCart}
                                     variant="dark"
-                                    onClick={() => handleAddToCart(item.id, item.name, item.price, item.image_url)}
+                                    onClick={() => handleAddToCart(item.id, item.name, item.price, item.image_url,item.category)}
                                 />
                             </div>
                         </div>

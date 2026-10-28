@@ -12,6 +12,7 @@ import useCookie from "react-use-cookie";
 import WishlistItem from "../components/WishlistItem";
 import { method } from "lodash";
 import toast from "react-hot-toast";
+import Container from "../../../components/Container";
 
 const WishListPage = () => {
 
@@ -72,14 +73,15 @@ const WishListPage = () => {
 
 
   return (
-    <div className="min-h-screen bg-white  text-[#26382C]">
+    <Container>
+      <div className="bg-white  text-[#26382C]">
 
 
       <section className="relative font-sans overflow-hidden border-b border-[#E8E5DB] bg-white">
         <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-[#DCE7D8]/60 blur-3xl" />
         <div className="absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-[#E7E4D7]/70 blur-3xl" />
 
-        <div className="relative mx-auto max-w-7xl px-5 py-12 md:px-10 md:py-16 lg:px-16">
+        <div className="relative  py-12  md:py-16 ">
           {/* <Link
             to="/shop"
             className="mb-10 inline-flex items-center gap-2 text-sm text-[#687568] transition hover:text-[#2B7A4B]"
@@ -91,16 +93,13 @@ const WishListPage = () => {
 
           <div className="flex flex-col justify-between gap-8 md:flex-row md:items-end">
             <div className="max-w-2xl">
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#D6DFD0] bg-white/60 px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-[#527455]">
-                <Sparkles size={14} />
-                Your personal collection
-              </div>
+              
 
-              <h1 className="font-heading text-4xl leading-tight tracking-tight md:text-6xl">
+              <h1 className="text-2xl font-semibold mb-2 text-ink">
                 Plants you <span className="italic text-[#2B7A4B]">love.</span>
               </h1>
 
-              <p className="mt-5 max-w-lg text-sm leading-7 text-[#697367] md:text-base">
+              <p className="text-sm text-ink-secondary">
                 A little corner for all the greenery that caught your eye.
                 Keep your favorites close and bring your dream garden to life.
               </p>
@@ -121,7 +120,7 @@ const WishListPage = () => {
           </div>
         </div>
       </section>
-      <main className="mx-auto max-w-7xl px-5 py-10 md:px-10 md:py-14 lg:px-16">
+      <main className="py-10 md:py-14 ">
 
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -186,7 +185,6 @@ const WishListPage = () => {
           </div>
         </section>
 
-        {/* Small Footer */}
         <div className="mt-8 flex items-center justify-center gap-2 pb-4 text-xs text-[#929487]">
           <Leaf size={14} />
           <span>Growing happiness, one plant at a time.</span>
@@ -194,6 +192,7 @@ const WishListPage = () => {
 
       </main>
     </div>
+    </Container>
   );
 };
 

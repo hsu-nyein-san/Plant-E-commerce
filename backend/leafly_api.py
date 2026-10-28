@@ -1,9 +1,10 @@
-from fastapi import FastAPI, Depends , HTTPException, status ,UploadFile, File
+from fastapi import FastAPI, Depends , HTTPException, status ,UploadFile, File , Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, Text,DateTime, ForeignKey,func,desc,UniqueConstraint, or_
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, Text,DateTime, ForeignKey,func,desc,UniqueConstraint,JSON, or_
 from sqlalchemy.orm import sessionmaker, declarative_base, Session ,relationship,joinedload
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.sql import func
 from pydantic import BaseModel,EmailStr, Field, field_validator , ConfigDict
 from datetime import datetime,timedelta
 from typing import List, Optional, Union
@@ -81,10 +82,14 @@ class Order(Base):
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, index=True)
+    order_number = Column(String(30), unique=True, index=True, nullable=True)
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     user_email = Column(String(200), index=True)
     total = Column(Float, default=0)
 
     status = Column(String(50), default="pending", index=True)
+    order_status=Column(String(50),default="pending")
 
     shipping_name = Column(String(200))
     shipping_phone = Column(String(50))
@@ -93,13 +98,22 @@ class Order(Base):
     shipping_zip = Column(String(20))
     shipping_country = Column(String(100), default="Myanmar")
 
-    payment_method = Column(String(50))    
-    payment_last4 = Column(String(4))     
+    payment_method = Column(String(50))
+    payment_last4 = Column(String(4))
 
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
 
-    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    items = relationship(
+        "OrderItem",
+        back_populates="order",
+        cascade="all, delete-orphan"
+    )
+    user = relationship("User", back_populates="orders")
 
 
 class OrderItem(Base):
@@ -109,7 +123,9 @@ class OrderItem(Base):
     order_id = Column(Integer, ForeignKey("orders.id"), index=True)
 
     plant_id = Column(Integer, ForeignKey("plants.id"), index=True)
-    plant_name = Column(String(200))       
+    plant_name = Column(String(200))
+    image_url= Column(String(500), nullable=True)
+    category = Column(String(100), nullable=True)      
     price = Column(Float)                    
     quantity = Column(Integer, default=1)
     subtotal = Column(Float)                 
@@ -136,6 +152,8 @@ class User(Base):
         cascade="all, delete-orphan"
     )
 
+    orders = relationship("Order", back_populates="user")
+
 
 class Address(Base):
     __tablename__ = "addresses"
@@ -153,6 +171,7 @@ class Address(Base):
     phone = Column(String(50), nullable=False)
 
     address_line = Column(String(255), nullable=False)
+    apt = Column(String(100), nullable=True)
     city = Column(String(100), nullable=False)
     region = Column(String(100), nullable=False)   # <-- Changed from township
     postal_code = Column(String(20), nullable=True)
@@ -188,6 +207,8 @@ class PlantCreate(BaseModel):
 class OrderItemCreate(BaseModel):
     plant_id: int
     plant_name: str
+    image_url: Optional[str] = None
+    category: Optional[str] = None
     price: float
     quantity: int
 
@@ -208,6 +229,8 @@ class OrderItemResponse(BaseModel):
     id: int
     plant_id: int
     plant_name: str
+    image_url: Optional[str] = None
+    category: Optional[str] = None
     price: float
     quantity: int
     subtotal: float
@@ -218,13 +241,25 @@ class OrderItemResponse(BaseModel):
 
 class OrderResponse(BaseModel):
     id: int
-    user_email: str
+    order_number: Optional[str] = None
+    user_id: int
+    user_email: Optional[str] = None
     total: float
     status: str
-    shipping_name: str
-    shipping_city: str
-    payment_method: str
+    order_status:str
+
+    shipping_name: Optional[str] = None
+    shipping_phone: Optional[str] = None
+    shipping_address: Optional[str] = None
+    shipping_city: Optional[str] = None
+    shipping_zip: Optional[str] = None
+    shipping_country: Optional[str] = None
+
+    payment_method: Optional[str] = None
+    payment_last4: Optional[str] = None
+
     created_at: datetime
+
     items: List[OrderItemResponse]
 
     class Config:
@@ -335,6 +370,7 @@ class AddressBase(BaseModel):
     recipient_name: str
     phone: str
     address_line: str
+    apt: Optional[str] = None
     city: str
     region: str                                    # <-- Changed from township
     postal_code: Optional[str] = None
@@ -347,6 +383,7 @@ class AddressUpdate(BaseModel):
     recipient_name: Optional[str] = None
     phone: Optional[str] = None
     address_line: Optional[str] = None
+    apt: Optional[str] = None
     city: Optional[str] = None
     region: Optional[str] = None                   
     postal_code: Optional[str] = None
@@ -359,6 +396,22 @@ class AddressResponse(AddressBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class CheckoutDraft(Base):
+    __tablename__="checkout_drafts"
+
+    id=Column(Integer,primary_key=True,index=True)
+
+    user_id=Column(
+        Integer,
+        ForeignKey("users.id"),
+        unique=True,
+        nullable=False,
+        index=True
+    )
+
+    draft_data=Column(JSON,nullable=False,default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 
@@ -886,7 +939,7 @@ def get_plants(
 
 
 @app.post("/api/orders/", response_model=OrderResponse)
-def create_order(order: OrderCreate, db: Session = Depends(get_db)):
+def create_order(order: OrderCreate, db: Session = Depends(get_db),current_user:User=Depends(get_current_user)):
     if not order.items:
         raise HTTPException(400, "Order must have at least one item")
 
@@ -896,10 +949,16 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     tax = 10.0
     total = subtotal - discount + shipping_fee + tax
 
+    if order.payment_method == "COD":
+        order_status = "pending"
+    else:
+        order_status = "paid"
+
     db_order = Order(
+        user_id=current_user.id,
         user_email=order.user_email,
         total=total,
-        status="paid",         
+        status=order_status,         
         shipping_name=order.shipping_name,
         shipping_phone=order.shipping_phone,
         shipping_address=order.shipping_address,
@@ -910,13 +969,20 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db)):
         payment_last4=order.payment_last4,
     )
     db.add(db_order)
-    db.flush()     
+    db.flush() 
+
+    created_date = db_order.created_at or datetime.utcnow()
+ 
+
+    db_order.order_number = (f"LF-{created_date:%Y%m%d}-{db_order.id:04d}") 
 
     for item in order.items:
         db_item = OrderItem(
             order_id=db_order.id,
             plant_id=item.plant_id,
             plant_name=item.plant_name,
+            image_url=item.image_url,
+            category=item.category,
             price=item.price,
             quantity=item.quantity,
             subtotal=item.price * item.quantity,
@@ -926,10 +992,47 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_order)
 
-    print(f"\n🎉 Order #{db_order.id} created — ${total:.2f}")
+    print("Saved order number:", db_order.order_number)
     return db_order
 
+@app.get("/api/orders/search",response_model=List[OrderResponse])
+def search_plants(
+    q:str,
+    db:Session =Depends(get_db),
+    cuurent_user:User=Depends(get_current_user)
+):
+    search=f"%{q}%"
 
+    order=(
+        db.query(Order)
+        .outerjoin(Order.items)
+        .filter
+        (
+            Order.user_id == cuurent_user.id,
+            or_(
+                Order.order_number.ilike(search),
+                Order.user_email.ilike(search),
+                Order.items.any(
+                    OrderItem.plant_name.ilike(search)
+                )
+            )
+        ).distinct().all()
+    )
+
+    return order
+
+@app.get("/api/orders/status/{status}",response_model=List[OrderResponse])
+def get_orders_by_status(
+    status : str,
+    db:Session = Depends(get_db),
+    current_user:User =Depends(get_current_user)
+):
+    orders=db.query(Order).filter(
+        Order.user_id == current_user.id,
+        Order.order_status == status
+    ).all()
+
+    return orders
 
 @app.get("/api/orders/", response_model=List[OrderResponse])
 def get_orders(
@@ -961,25 +1064,37 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
 
 
 class StatusUpdate(BaseModel):
-    status: str
+    order_status: str
 
-@app.patch("/api/orders/{order_id}/status", response_model=OrderResponse)
+
+
+@app.patch("/api/orders/{order_id}/order_status", response_model=OrderResponse)
 def update_status(
     order_id: int,
     body: StatusUpdate,
     db: Session = Depends(get_db),
 ):
-    valid = ["pending", "paid", "shipped", "delivered", "cancelled"]
-    if body.status not in valid:
-        raise HTTPException(400, f"Status must be one of {valid}")
+    valid = [
+    "pending",
+    "processing",
+    "in_transit",
+    "delivered",
+    "cancelled",
+]
+
+    if body.order_status not in valid:
+        raise HTTPException(400, f"Order status must be one of {valid}")
 
     order = db.query(Order).filter(Order.id == order_id).first()
+
     if not order:
         raise HTTPException(404, "Order not found")
 
-    order.status = body.status
+    order.order_status = body.order_status
+
     db.commit()
     db.refresh(order)
+
     return order
 
 
@@ -1221,6 +1336,21 @@ def create_plant(plant: PlantCreate, db: Session = Depends(get_db)):
     db.refresh(db_plant)
     return db_plant
 
+@app.get("/api/plant/search")
+def search_plants(
+    keyword:str =Query(...,min_length=1),
+    db:Session = Depends(get_db)
+):
+    plants=db.query(Plant).filter(
+        Plant.name.ilike(f"%{keyword}%")
+    ).all()
+
+    return{
+        "keyword": keyword,
+        "total": len(plants),
+        "plants": plants
+    }
+
 
 @app.post("/api/addresses/", response_model=list[AddressResponse])
 def create_address(
@@ -1244,6 +1374,43 @@ def create_address(
     db.refresh(address)
 
     return address
+
+@app.patch("/api/addresses/")
+def patch_address(
+    payload: AddressUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    address = db.query(Address).filter(
+        Address.user_id == current_user.id
+    ).first()
+
+    if not address:
+        raise HTTPException(
+            status_code=404,
+            detail="Address not found"
+        )
+
+    if payload.recipient_name is not None:
+        address.recipient_name = payload.recipient_name
+    if payload.phone is not None:
+        address.phone = payload.phone
+    if payload.address_line is not None:
+        address.address_line = payload.address_line
+    if payload.apt is not None:
+        address.apt = payload.apt
+    if payload.city is not None:
+        address.city = payload.city
+    if payload.region is not None:
+        address.region = payload.region
+    if payload.postal_code is not None:
+        address.postal_code = payload.postal_code
+    if payload.is_default is not None:
+        address.is_default = payload.is_default
+
+    db.commit()
+
+    return {"message": "Address saved successfully"}
 
 @app.patch("/api/addresses/{address_id}", response_model=AddressResponse)
 def patch_address(
@@ -1281,6 +1448,8 @@ def patch_address(
 
 
 
+
+
 @app.get("/api/addresses/", response_model=list[AddressResponse])
 def get_addresses(
     db: Session = Depends(get_db),
@@ -1306,6 +1475,58 @@ def get_address(
         raise HTTPException(404, "Address not found")
     return address
 
+@app.post("/api/checkout-draft")
+def save_checkout_draft(
+    data:dict,
+    db:Session = Depends(get_db),
+    current_user:User = Depends(get_current_user)
+):
+    draft= db.query(CheckoutDraft).filter(
+        CheckoutDraft.user_id == current_user.id
+    ).first()
+
+    if draft:
+        draft.draft_data=data
+    else:
+        draft =CheckoutDraft(
+            user_id=current_user.id,
+            draft_data=data
+        )
+        db.add(draft)
+    db.commit()
+
+    return {"message": "Draft saved successfully"}
+
+@app.get("/api/checkout-draft")
+def get_checkout_draft(
+    db:Session =Depends(get_db),
+    current_user:User =Depends(get_current_user)
+):
+    draft=db.query(CheckoutDraft).filter(
+        CheckoutDraft.user_id == current_user.id
+    ).first()
+
+    if not draft:
+        return {"draft_data":None}
+
+    return {"draft_data":draft.draft_data}
+
+@app.delete("/api/checkout-draft")
+def delete_checkout_draft(
+    db:Session =Depends(get_db),
+    current_user:User =Depends(get_current_user)
+):
+    draft=db.query(CheckoutDraft).filter(
+        CheckoutDraft.user_id == current_user.id
+    ).first()
+
+    if not draft :
+        return {"message": "No checkout draft found"}
+
+    db.delete(draft)
+    db.commit()
+
+    return {"message": "Checkout draft deleted successfully"}
 
 def seed_plants():
     db = SessionLocal()

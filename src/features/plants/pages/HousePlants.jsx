@@ -51,7 +51,7 @@ const HousePlants = () => {
                 <div className="lg:col-span-6 flex flex-col">
                     <PlantInfo productId={plant.id} productName={plant.name}/>
                     <ReviewsSection />
-                    <AccessoriesSection/>
+                    {/* <AccessoriesSection/> */}
                 </div>
             </div>
         </Container>
