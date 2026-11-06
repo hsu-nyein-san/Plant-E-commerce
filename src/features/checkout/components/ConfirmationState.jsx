@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react'
-import React, { useEffect } from 'react'
+import React from 'react'
 import Button from '../../../components/Button'
 import { Link } from 'react-router-dom'
 
@@ -7,29 +7,30 @@ const ConfirmationState = ({
   order,
   onContinueShopping,
   onViewOrder,
-  
 }) => {
-  const orderId = order?.id ? `LD-${String(order.id).padStart(5, '0')}` : 'LD-00000'
+  const orderId = order?.id
+    ? `LD-${String(order.id).padStart(5, '0')}`
+    : 'LD-00000'
+
   const placedAt = order?.created_at
-  ? new Date(order.created_at).toLocaleString('my-MM', {
+    ? new Date(order.created_at).toLocaleString('en-US', {
       dateStyle: 'medium',
       timeStyle: 'short',
     })
-  : 'မကြာမီ'
+    : 'Recently'
 
   const email = order?.user_email || 'your email'
-  const total =order?.total || 0.00
+  const total = Number(order?.total ?? order?.total_amount ?? 0)
   const city = order?.shipping_city || 'your address'
 
   const estimatedDate = new Date()
   estimatedDate.setDate(estimatedDate.getDate() + 3)
+
   const estimated = estimatedDate.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
   })
-
-  
 
   return (
     <div className="pt-14">
@@ -62,7 +63,7 @@ const ConfirmationState = ({
                 Order total
               </p>
               <p className="text-sm font-medium">
-                ${Number(total).toFixed(2)}
+                ${total.toFixed(2)}
               </p>
             </div>
 
@@ -77,20 +78,22 @@ const ConfirmationState = ({
               <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-1">
                 Need help?
               </p>
-              <Button text="View plant care guide" variant="secondaryDark" />
+              <Button
+                text="View plant care guide"
+                variant="secondaryDark"
+              />
             </div>
           </div>
 
           <div className="flex gap-4">
             <Link to="/shop">
-            <Button
-              variant="dark"
-              text="Continue shopping"
-              
-              onClick={onContinueShopping}
-              
-            />
+              <Button
+                variant="dark"
+                text="Continue shopping"
+                onClick={onContinueShopping}
+              />
             </Link>
+
             <Button
               variant="secondaryDark"
               text="View order details"
@@ -98,11 +101,10 @@ const ConfirmationState = ({
             />
           </div>
 
-          {/* ⭐ Dynamic email */}
           <p className="text-[10px] text-gray-400 mt-6">
-            A confirmation email has been sent to {email}. If you have
-            questions, visit our help center or contact support. Responsible
-            packaging with recyclable materials.
+            A confirmation email has been sent to {email}.
+            If you have questions, visit our help center or contact support.
+            Responsible packaging with recyclable materials.
           </p>
         </div>
       </div>

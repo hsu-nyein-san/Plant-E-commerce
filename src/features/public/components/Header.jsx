@@ -205,14 +205,12 @@ const Header = () => {
           </div>
         </div>
 
-        {/* Mobile search bar */}
         {mobileSearchOpen && (
           <div className="border-t border-gray-100 px-4 py-3 sm:hidden">
             <PlantSearch />
           </div>
         )}
 
-        {/* Mobile menu */}
         <div
           className={`overflow-hidden border-t border-gray-100 bg-white transition-[max-height,opacity] duration-300 ease-in-out md:hidden ${
             mobileMenuOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"

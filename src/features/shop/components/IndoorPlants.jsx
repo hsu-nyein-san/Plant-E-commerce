@@ -112,17 +112,15 @@ const IndoorPlants = ({ result, pagination, onPageChange, setResult, setPaginati
   const goToPage = (newPage) => {
     const target = Number(newPage)
 
-    console.log('🖱️ goToPage:', { from: page, to: target })
 
     if (!Number.isInteger(target)) return
     if (target < 1) return
-    if (target === page) return                  // same page → skip
+    if (target === page) return                
     if (pagination && target > pagination.pages) return
 
     setPage(target)
     onPageChange?.(target)
   }
-  console.log(pagination?.pages);
 
   const toggleWishlist = async (plantId) => {
 

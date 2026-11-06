@@ -8,6 +8,7 @@ import useCookie from 'react-use-cookie'
 import toast from 'react-hot-toast'
 import { Link, useNavigate } from 'react-router-dom'
 import Button from '../../../components/Button'
+import { result } from 'lodash'
 
 const ShippingSection = ({ initialData = {}, onNext }) => {
 
@@ -84,6 +85,7 @@ const draft = user?.id
         setDraftData(false);
         await fetchAddress();
       }
+
 
     };
 
@@ -193,6 +195,9 @@ const draft = user?.id
         toast.success(result.message);
         navigate("/shop");
       }
+      else{
+        toast.error(result.detail)
+      }
     }
     else {
       localStorage.setItem("checkout_draft", JSON.stringify(data))
@@ -203,35 +208,73 @@ const draft = user?.id
   console.log(address);
 
 
-  const onSubmit = async (data) => {
+  
+
+const onSubmit = async (data) => {
+  const addressData = {
+    recipient_name: data.fullName,
+    phone: data.phone,
+    address_line: data.address,
+    apt: data.apt,
+    city: data.city,
+    region: data.state,
+    postal_code: data.zip,
+  };
+
+  try {
+    let res;
+
     if (isSaved) {
-      const res = await fetch('http://127.0.0.1:8000/api/addresses',
-        {
-          method: "PATCH",
+      // Update existing address
+      res = await fetch("http://127.0.0.1:8000/api/addresses/", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(addressData),
+      });
+
+      // If address does not exist, create a new one
+      if (res.status === 404) {
+        res = await fetch("http://127.0.0.1:8000/api/addresses/", {
+          method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            recipient_name: data.fullName,
-            phone: data.phone,
-            address_line:data.address,
-            apt: data.apt,
-            city: data.city,
-            region: data.state,
-            postal_code: data.zip,
-
-          })
-        }
-      )
-      const reult=await res.json();
-      if(res.ok)
-      {
-        toast.success(reult.message)
+          body: JSON.stringify(addressData),
+        });
       }
+    } else {
+      // Create new address
+      res = await fetch("http://127.0.0.1:8000/api/addresses/", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(addressData),
+      });
     }
-    onNext?.(data)
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      toast.error(result.detail || "Failed to save address");
+      return;
+    }
+
+    toast.success(result.message || "Address saved successfully");
+
+    onNext?.(data);
+
+  } catch (error) {
+    console.error("Address error:", error);
+    toast.error(error.message || "Something went wrong");
   }
+};
+
   return (
     <form className="" onSubmit={handleSubmit(onSubmit)}>
       <SectionHeader

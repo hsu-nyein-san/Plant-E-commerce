@@ -1,231 +1,173 @@
 
-import React, { useState } from 'react'
-import SectionHeader from './SectionHeader'
-import CheckoutField from './CheckoutField'
-import { useForm } from 'react-hook-form'
-import { Apple, CreditCard, Truck } from 'lucide-react'
+import React, { useState } from "react";
+import { CreditCard, Truck, ShieldCheck, CheckCircle2 } from "lucide-react";
+import SectionHeader from "./SectionHeader";
 
 const PaymentSection = ({ initialData = {}, onNext, onBack }) => {
     const [paymentMethod, setPaymentMethod] = useState(
-        initialData.method || 'Card'
-    )
+        initialData.method || "2C2P"
+    );
 
-    const {
-        register,
-        handleSubmit,
-        formState: { errors },
-    } = useForm({
-        defaultValues: {
-            cardNumber: initialData.cardNumber || '',
-            cardName: initialData.cardName || '',
-            expiry: initialData.expiry || '',
-            cvv: initialData.cvv || '',
-        },
-        mode: 'onBlur',
-    })
-
-    const onSubmit = (data) => {
-        if (paymentMethod === 'COD') {
-            onNext?.({
-                method: 'COD',
-                cardNumber: '',
-                cardName: '',
-                expiry: '',
-                cvv: '',
-            })
-            return
-        }
-
+    const onSubmit = () => {
         onNext?.({
-            ...data,
             method: paymentMethod,
-        })
-    }
-
-    const handleApplePay = () => {
-        onNext?.({
-            method: 'ApplePay',
-            cardNumber: '',
-            cardName: '',
-            expiry: '',
-            cvv: '',
-        })
-    }
-
-    const handleGPay = () => {
-        onNext?.({
-            method: 'GPay',
-            cardNumber: '',
-            cardName: '',
-            expiry: '',
-            cvv: '',
-        })
-    }
+            cardNumber: "",
+            cardName: "",
+            expiry: "",
+            cvv: "",
+        });
+    };
 
     return (
-        <form className="py-14" onSubmit={handleSubmit(onSubmit)}>
+        <div className="py-8 sm:py-14">
             <SectionHeader
                 number="2"
                 title="Payment"
-                subtitle="Choose your preferred payment method."
+                subtitle="Choose how you would like to pay for your order."
             />
 
             <div className="space-y-5">
-                <div className="grid grid-cols-2 gap-4">
-                    <button
-                        type="button"
-                        onClick={() => setPaymentMethod('Card')}
-                        className={`flex items-center justify-center gap-2 rounded-md border p-4 transition-colors ${
-                            paymentMethod === 'Card'
-                                ? 'border-black bg-gray-100'
-                                : 'border-gray-200 hover:bg-gray-50'
-                        }`}
-                    >
-                        <CreditCard size={18} />
-                        <span className="text-sm font-medium">Card</span>
-                    </button>
 
-                    <button
-                        type="button"
-                        onClick={() => setPaymentMethod('COD')}
-                        className={`flex items-center justify-center gap-2 rounded-md border p-4 transition-colors ${
-                            paymentMethod === 'COD'
-                                ? 'border-black bg-gray-100'
-                                : 'border-gray-200 hover:bg-gray-50'
+                <button
+                    type="button"
+                    onClick={() => setPaymentMethod("2C2P")}
+                    className={`w-full rounded-xl border p-4 sm:p-5 text-left transition-all ${paymentMethod === "2C2P"
+                            ? "border-[#2B7A4B] bg-[#F7FAF6] ring-1 ring-[#2B7A4B]"
+                            : "border-gray-200 hover:border-gray-300"
                         }`}
-                    >
-                        <Truck size={18} />
-                        <span className="text-sm font-medium">
-                            Cash on Delivery
-                        </span>
-                    </button>
-                </div>
+                >
+                    <div className="flex items-center gap-3 sm:gap-4">
 
-                {paymentMethod === 'COD' ? (
-                    <div className="rounded-md border border-gray-200 bg-gray-50 p-5">
-                        <div className="flex items-start gap-3">
-                            <Truck size={22} className="mt-1 shrink-0" />
-                            <div>
-                                <h3 className="font-medium text-gray-900">
-                                    Pay when your order arrives
-                                </h3>
-                                <p className="mt-1 text-sm text-gray-500">
-                                    You can pay for your plants when the
-                                    delivery arrives at your address. No card
-                                    details are required.
-                                </p>
-                            </div>
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white border border-gray-100">
+                            <CreditCard size={22} className="text-[#2B7A4B]" />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                            <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
+                                Online Payment
+                            </h3>
+                            <p className="mt-1 text-xs sm:text-sm text-gray-500">
+                                Secure payment powered by 2C2P
+                            </p>
+                        </div>
+
+                        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${paymentMethod === "2C2P"
+                                ? "border-[#2B7A4B] bg-[#2B7A4B]"
+                                : "border-gray-300"
+                            }`}>
+                            {paymentMethod === "2C2P" && (
+                                <CheckCircle2 size={14} className="text-white" />
+                            )}
                         </div>
                     </div>
-                ) : (
-                    <>
-                        <CheckoutField
-                            label="Card number"
-                            placeholder="1234567890123456"
-                            error={errors.cardNumber?.message}
-                            {...register('cardNumber', {
-                                required: 'Card number is required',
-                                pattern: {
-                                    value: /^\d{13,19}$/,
-                                    message: 'Enter 13–19 digits without spaces',
-                                },
-                            })}
-                        />
 
-                        <CheckoutField
-                            label="Name on card"
-                            placeholder="LINDA RHODES"
-                            error={errors.cardName?.message}
-                            {...register('cardName', {
-                                required: 'Name on card is required',
-                            })}
-                        />
+                    {paymentMethod === "2C2P" && (
+                        <div className="mt-4 border-t border-[#E4EDE1] pt-4">
 
-                        <div className="grid grid-cols-2 gap-5">
-                            <CheckoutField
-                                label="Expiry"
-                                placeholder="MM/YY"
-                                maxLength={5}
-                                error={errors.expiry?.message}
-                                {...register('expiry', {
-                                    required: 'Expiry is required',
-                                    pattern: {
-                                        value: /^(0[1-9]|1[0-2])\/\d{2}$/,
-                                        message: 'Use MM/YY',
-                                    },
-                                })}
-                            />
+                            <div className="flex items-start gap-2">
+                                <ShieldCheck
+                                    size={18}
+                                    className="shrink-0 text-[#2B7A4B]"
+                                />
 
-                            <CheckoutField
-                                label="CVV"
-                                placeholder="123"
-                                maxLength={4}
-                                error={errors.cvv?.message}
-                                {...register('cvv', {
-                                    required: 'CVV is required',
-                                    pattern: {
-                                        value: /^\d{3,4}$/,
-                                        message: 'Invalid CVV',
-                                    },
-                                })}
-                            />
+                                <div>
+                                    <p className="text-sm font-medium text-gray-800">
+                                        Secure checkout with 2C2P
+                                    </p>
+                                    <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                                        You will be redirected to the secure
+                                        2C2P payment page to complete your
+                                        transaction.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 flex flex-wrap items-center gap-2">
+                                <span className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
+                                    Visa
+                                </span>
+                                <span className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
+                                    Mastercard
+                                </span>
+                                <span className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
+                                    Other supported methods
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => setPaymentMethod("COD")}
+                    className={`w-full rounded-xl border p-4 sm:p-5 text-left transition-all ${paymentMethod === "COD"
+                            ? "border-[#2B7A4B] bg-[#F7FAF6] ring-1 ring-[#2B7A4B]"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                >
+                    <div className="flex items-center gap-3 sm:gap-4">
+
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white border border-gray-100">
+                            <Truck size={22} className="text-gray-600" />
                         </div>
 
-                        <p className="text-xs text-gray-400">
-                            Demo card form only. Connect a payment provider
-                            before accepting real card payments.
-                        </p>
-
-                        <div className="flex gap-4">
-                            <button
-                                type="button"
-                                onClick={handleApplePay}
-                                className="flex flex-1 items-center justify-center gap-2 rounded-md border border-gray-200 py-3 hover:bg-gray-50"
-                            >
-                                <Apple size={18} />
-                                <span className="text-sm font-medium">
-                                    Apple Pay
-                                </span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleGPay}
-                                className="flex flex-1 items-center justify-center gap-2 rounded-md border border-gray-200 py-3 hover:bg-gray-50"
-                            >
-                                <CreditCard size={18} />
-                                <span className="text-sm font-medium">
-                                    Google Pay
-                                </span>
-                            </button>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
+                                Cash on Delivery
+                            </h3>
+                            <p className="mt-1 text-xs sm:text-sm text-gray-500">
+                                Pay when your order arrives
+                            </p>
                         </div>
-                    </>
-                )}
 
-                <div className="flex items-center justify-between pt-3">
+                        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${paymentMethod === "COD"
+                                ? "border-[#2B7A4B] bg-[#2B7A4B]"
+                                : "border-gray-300"
+                            }`}>
+                            {paymentMethod === "COD" && (
+                                <CheckCircle2 size={14} className="text-white" />
+                            )}
+                        </div>
+                    </div>
+
+                    {paymentMethod === "COD" && (
+                        <div className="mt-4 border-t border-[#E4EDE1] pt-4">
+                            <p className="text-xs leading-relaxed text-gray-500">
+                                Pay for your plants directly to the delivery
+                                person when your order arrives. No card details
+                                are required.
+                            </p>
+                        </div>
+                    )}
+                </button>
+
+                <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-4 pt-5">
+
                     <button
                         type="button"
                         onClick={onBack}
-                        className="text-sm text-gray-500 hover:text-black"
+                        className="text-sm text-gray-500 hover:text-gray-900"
                     >
                         Back to shipping
                     </button>
 
                     <button
-                        type="submit"
-                        className="rounded-md bg-black px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+                        type="button"
+                        onClick={onSubmit}
+                        className="w-full sm:w-auto rounded-lg bg-[#2B7A4B] px-8 py-3.5 text-sm font-medium text-white transition hover:bg-[#23653E]"
                     >
                         Continue to review
                     </button>
+
                 </div>
 
                 <p className="text-center text-xs text-gray-400">
-                    Your order details will be reviewed before placing
-                    the order.
+                    Your payment information is handled securely by the payment provider.
                 </p>
-            </div>
-        </form>
-    )
-}
 
-export default PaymentSection
+            </div>
+        </div>
+    );
+};
+
+export default PaymentSection;

@@ -8,6 +8,8 @@ const OrderHistorySection = () => {
     const [userCookie] = useCookie("user");
     const [token] = useCookie("token")
     const [orders, setOrders] = useState([]);
+    const [activeStatus, setActiveStatus] = useState("All Orders");
+
 
 
     const user = userCookie ? JSON.parse(userCookie) : [];
@@ -66,24 +68,21 @@ const OrderHistorySection = () => {
                 </div>
 
                 <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
-                    <button onClick={() => handleSearchStatus()} className="whitespace-nowrap rounded-lg bg-[#2B7A4B] px-4 py-2 text-sm font-medium text-white">
-                        All Orders
-                    </button>
-                    <button onClick={() => handleSearchStatus('Pending')} className="whitespace-nowrap rounded-lg bg-[#F7F4EF] px-4 py-2 text-sm font-medium text-gray-600">
-                        Pending
-                    </button>
-                    <button onClick={() => handleSearchStatus('Processing')} className="whitespace-nowrap rounded-lg bg-[#F7F4EF] px-4 py-2 text-sm font-medium text-gray-600 hover:bg-[#EAE6DF]">
-                        Processing
-                    </button>
-                    <button onClick={() => handleSearchStatus('In Transit')} className="whitespace-nowrap rounded-lg bg-[#F7F4EF] px-4 py-2 text-sm font-medium text-gray-600 hover:bg-[#EAE6DF]">
-                        In Transit
-                    </button>
-                    <button onClick={() => handleSearchStatus('Delivered')} className="whitespace-nowrap rounded-lg bg-[#F7F4EF] px-4 py-2 text-sm font-medium text-gray-600 hover:bg-[#EAE6DF]">
-                        Delivered
-                    </button>
-                    <button onClick={() => handleSearchStatus('Cancelled')} className="whitespace-nowrap rounded-lg bg-[#F7F4EF] px-4 py-2 text-sm font-medium text-gray-600 hover:bg-[#EAE6DF]">
-                        Cancelled
-                    </button>
+                    {
+                        [
+                            "All Orders",
+                            "Pending",
+                            "Processing",
+                            "In Transit",
+                            "Delivered",
+                            "Cancelled"
+
+                        ].map((status) => (
+                            <button onClick={() => { setActiveStatus(status); handleSearchStatus(status === "All Orders" ? undefined : status) }} className={`whitespace-nowrap rounded-lg ${activeStatus === status ? "bg-[#2B7A4B] text-white" : "bg-[#F7F4EF] text-gray-600 hover:bg-[#EAE6DF]"} px-4 py-2 text-sm font-medium text-gray-600 hover:bg-[#EAE6DF]`}>
+                                {status}
+                            </button>
+                        ))
+                    }
                 </div>
             </div>
 

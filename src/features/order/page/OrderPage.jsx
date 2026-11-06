@@ -67,7 +67,7 @@ const OrderPage = () => {
             </h1>
 
             
-            
+       
 
             <p className="text-sm text-ink-secondary">
               Keep track of your plants and every order you make.

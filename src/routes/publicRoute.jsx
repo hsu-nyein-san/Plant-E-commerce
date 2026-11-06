@@ -30,6 +30,10 @@ const publicRoute = [
     element: <CheckoutPage/>,
   },
   {
+  path: "payment/return",
+  element: <CheckoutPage />,
+},
+  {
     path: "cart",
     element: <CartPage/>,
   },

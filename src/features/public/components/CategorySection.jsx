@@ -5,16 +5,21 @@ const categories = [
     { title: 'Best Sellers', desc: 'Top-loved plants from our collection', img: 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?auto=format&fit=crop&q=80&w=150&h=150' },
     { title: 'New Arrivals', desc: 'Fresh selections every month' },
     { title: 'Low Light', desc: 'Perfect choices for shaded rooms' },
-    { title: 'Care Kits', desc: 'Tools & nutrients to keep them thriving' },
+    {
+    title: 'Pet-Friendly Plants',
+    desc: 'Beautiful plants safe for your furry friends'
+  },
+
 ];
 
-const CategorySection = () => {
+const CategorySection = ({setPick}) => {
+
     return (
         <Container>
             <section className="grid grid-cols-1 py-10 md:grid-cols-2 font-heading lg:grid-cols-4 gap-4">
 
                 {categories.map((cat, idx) => (
-                    <div key={idx} className="bg-white px-4 py-6 rounded-2xl flex gap-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+                    <div key={idx} onClick={()=>setPick(cat.title)} className="bg-white px-4 py-6 rounded-2xl flex gap-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
                         {cat.img && (
                             <img src={cat.img} alt={cat.title} className="w-12 h-12 rounded-lg object-cover" />
                         ) }

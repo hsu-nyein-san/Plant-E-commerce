@@ -19,7 +19,7 @@ const HeroSection = () => {
         </p>
         <div className="flex text-sm flex-wrap gap-4 pt-2">
           <Link to="/shop"><Button text="Shop Plants" variant="primary"/></Link>
-          <Button variant="secondary" text="Find the Right Plant" />
+          <Link to="/plant-finder"><Button variant="secondary" text="Find the Right Plant" /></Link>
         </div>
         <div className="flex flex-col gap-8 md:flex-row md:gap-6 lg:flex-row lg:gap-6 text-sm text-ink-secondary pt-4">
             <p>Free potting for orders over $60</p>

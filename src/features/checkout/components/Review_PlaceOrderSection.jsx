@@ -13,92 +13,108 @@ const Review_PlaceOrderSection = ({ items = [] ,shippingData={} ,paymentData={} 
 
   const [token]=useCookie("token");
 
-  console.log(items);
   
 
-  const handlePlaceOrder=async ()=>{
-    if (token)
-    {
-      try {
-      const payload = {
+  const handlePlaceOrder = async () => {
+  if (!token) {
+    toast.error("Please login first");
+    return;
+  }
+
+  try {
+    const payload = {
       user_email: shippingData.email,
       shipping_name: shippingData.fullName,
       shipping_phone: shippingData.phone,
       shipping_address: shippingData.address,
       shipping_city: shippingData.city,
       shipping_zip: shippingData.zip,
-      shipping_country: shippingData.country || 'Myanmar',
-      payment_method: paymentData.method || 'Card',
-      payment_last4: paymentData.cardNumber
-        ? paymentData.cardNumber.replace(/\D/g, '').slice(-4)
-        : null,
+      shipping_country: shippingData.country || "Myanmar",
+
+      payment_method:
+        paymentData.method === "COD" ? "COD" : "2C2P",
+
+      payment_last4: null,
+
       items: items.map((item) => ({
         plant_id: item.id,
         plant_name: item.name,
-        image_url:item.image,
-        category:item.category,
+        image_url: item.image,
+        category: item.category,
         price: item.price,
         quantity: item.quantity,
       })),
-    }
+    };
 
-    const res=await fetch(`http://127.0.0.1:8000/api/orders/`,{
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        Authorization:`Bearer ${token}`
-      },
-      body:JSON.stringify(payload),
-    })
+    const res = await fetch(
+      "http://127.0.0.1:8000/api/orders/",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const order = await res.json();
 
     if (!res.ok) {
-      const err = await res.json()
-      throw new Error(err.detail || `HTTP ${res.status}`)
+      throw new Error(order.detail || "Failed to create order");
     }
 
-    const order=await res.json();
+    // 2. COD
+    if (order.payment_method === "COD") {
+      localStorage.removeItem("leafly_cart");
+      localStorage.removeItem("checkout_draft");
 
-    localStorage.removeItem('leafly_cart')
+      window.dispatchEvent(new Event("cartUpdated"));
 
-    console.log(localStorage.getItem("checkout_draft"));
-    
-    if(localStorage.getItem("checkout_draft") != null)
-    {
-      localStorage.removeItem("checkout_draft")
-      toast.success("delete local storage")
-      
-    }
-    else
-    {
-      const res2=await fetch('http://127.0.0.1:8000/api/checkout-draft',
-      {
-        method:'DELETE',
-        headers:{
-          Authorization : `Bearer ${token}`,
+      await fetch(
+        "http://127.0.0.1:8000/api/checkout-draft",
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
+      );
+
+      onPlaceOrder(order);
+      toast.success("Order placed successfully!");
+      return;
+    }
+
+    const paymentResponse = await fetch(
+      `http://127.0.0.1:8000/api/payments/${order.id}/create`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       }
-    )
+    );
 
-    const result=await res2.json();
+    const payment = await paymentResponse.json();
 
-    if(res2.ok)
-    {
-      toast.success(result.message)
+    if (!paymentResponse.ok) {
+      throw new Error(
+        payment.detail || "Unable to create payment"
+      );
     }
+
+    if (!payment.webPaymentUrl) {
+      throw new Error("Payment URL not found");
     }
 
-    
+    window.location.href = payment.webPaymentUrl;
 
-
-    onPlaceOrder();
-    setOrder(order)
-
-    } catch (error) {
-      console.log(error.message);
-      
-    }
-    }
+  } catch (error) {
+    console.error("Place order error:", error);
+    toast.error(error.message || "Something went wrong");
   }
+};
 
   return (
     <div className=''>

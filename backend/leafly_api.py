@@ -1,5 +1,6 @@
-from fastapi import FastAPI, Depends , HTTPException, status ,UploadFile, File , Query
+from fastapi import FastAPI, Depends , HTTPException, status ,UploadFile, File , Query ,Request ,Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, Text,DateTime, ForeignKey,func,desc,UniqueConstraint,JSON, or_
 from sqlalchemy.orm import sessionmaker, declarative_base, Session ,relationship,joinedload
@@ -16,6 +17,19 @@ import os
 import uuid
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
+import jwt
+import httpx
+from config import(
+    DATABASE_URL,
+    TWO_C2P_MERCHANT_ID,
+    TWO_C2P_SECRET_KEY,
+    TWO_C2P_CURRENCY,
+    TWO_C2P_BASE_URL
+)
+import base64
+import json
+from urllib.parse import parse_qs
+
 
 
 DB_USER = 'root'
@@ -59,6 +73,11 @@ class Plant(Base):
     dimensions = Column(String(100))
     origin = Column(String(100))
     care_instructions = Column(Text)
+    created_at = Column(
+    DateTime,
+    nullable=False,
+    server_default=func.current_timestamp()
+)
 
 class WishList(Base):
     __tablename__ ="wishlist"
@@ -114,6 +133,8 @@ class Order(Base):
         cascade="all, delete-orphan"
     )
     user = relationship("User", back_populates="orders")
+
+    payments = relationship("Payment",back_populates="order",cascade="all, delete-orphan")
 
 
 class OrderItem(Base):
@@ -182,6 +203,63 @@ class Address(Base):
 
     user = relationship("User", back_populates="addresses")
 
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    order_id = Column(
+        Integer,
+        ForeignKey("orders.id"),
+        nullable=False,
+        index=True
+    )
+
+    invoice_no = Column(
+        String(50),
+        unique=True,
+        index=True
+    )
+
+    amount = Column(Float, nullable=False)
+
+    currency = Column(String(10), default="SGD")
+
+    payment_method = Column(String(50), default="2CP")
+
+    status = Column(
+        String(50),
+        default="pending",
+        index=True
+    )
+
+    transaction_id = Column(String(100), nullable=True)
+
+    payment_token = Column(String(1000), nullable=True)
+
+    response_code = Column(String(20), nullable=True)
+
+    response_description = Column(
+        String(500),
+        nullable=True
+    )
+
+    web_payment_url = Column(String(1000), nullable=True)
+
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
+    order = relationship(
+        "Order",
+        back_populates="payments"
+    )
+    
 Base.metadata.create_all(bind=engine)
 
 
@@ -211,6 +289,8 @@ class OrderItemCreate(BaseModel):
     category: Optional[str] = None
     price: float
     quantity: int
+
+
 
 
 class OrderCreate(BaseModel):
@@ -356,6 +436,20 @@ class TokenResponse(BaseModel):
     user: UserResponse
 
 
+class BestSellerResponse(PlantResponse):
+    total_sold: int
+
+class PaginatedBestSellers(BaseModel):
+    items: List[BestSellerResponse]
+    total: int
+    page: int
+    limit: int
+    pages: int
+    has_next: bool
+    has_prev: bool
+
+
+
 class PaginatedPlants(BaseModel):
     items: List[PlantResponse]
     total: int
@@ -417,16 +511,22 @@ class CheckoutDraft(Base):
 
 app = FastAPI(title="Leafly API")
 
-UPLOAD_DIR=Path("uploads")
-UPLOAD_DIR.mkdir(parents=True,exist_ok=True)
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-app.mount("/uploads",StaticFiles(directory=str(UPLOAD_DIR)),name="uploads")
+app.mount(
+    "/uploads",
+    StaticFiles(directory=str(UPLOAD_DIR)),
+    name="uploads"
+)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -605,6 +705,179 @@ def _extract_pet_bool(pet_value):
             return v.lower() in ("yes", "true", "1")
     return None
 
+@app.get("/api/plants/best-sellers", response_model=PaginatedBestSellers)
+def get_best_sellers(
+    page: int = 1,
+    limit: int = 3,
+    db: Session = Depends(get_db)
+):
+    page = max(page, 1)
+    limit = max(min(limit, 100), 1)
+
+    total = (
+        db.query(func.count(func.distinct(Plant.id)))
+        .join(OrderItem, OrderItem.plant_id == Plant.id)
+        .join(Order, Order.id == OrderItem.order_id)
+        .filter(Order.status == "paid")
+        .scalar()
+    ) or 0
+
+    if total > 0:
+
+        results = (
+            db.query(
+                Plant,
+                func.sum(OrderItem.quantity).label("total_sold")
+            )
+            .join(OrderItem, OrderItem.plant_id == Plant.id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .filter(Order.status == "paid")
+            .group_by(Plant.id)
+            .order_by(
+                desc("total_sold"),
+                Plant.id.asc()
+            )
+            .offset((page - 1) * limit)
+            .limit(limit)
+            .all()
+        )
+
+        items = []
+
+        for plant, total_sold in results:
+            plant_data = PlantResponse.model_validate(plant).model_dump()
+            plant_data["total_sold"] = int(total_sold or 0)
+            items.append(plant_data)
+
+    else:
+
+        total = db.query(func.count(Plant.id)).scalar() or 0
+
+        results = (
+            db.query(Plant)
+            .order_by(Plant.created_at.desc())
+            .offset((page - 1) * limit)
+            .limit(limit)
+            .all()
+        )
+
+        items = []
+
+        for plant in results:
+            plant_data = PlantResponse.model_validate(plant).model_dump()
+            plant_data["total_sold"] = 0
+            items.append(plant_data)
+
+    pages = (total + limit - 1) // limit
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": pages,
+        "has_next": page < pages,
+        "has_prev": page > 1
+    }
+@app.get("/api/plants/new-arrivals",response_model=PaginatedPlants)
+def get_new_arrivals(
+    page:int =1,
+    limit: int =3,
+    db:Session = Depends(get_db)
+):
+    page =max(page,1)
+
+    limit=max(min(limit,100),1)
+
+    total= db.query(Plant).count()
+
+    plants=(
+        db.query(Plant)
+        .order_by(Plant.created_at.desc(), Plant.id.desc())
+        .offset((page -1 )* limit)
+        .limit(limit)
+        .all()
+    )
+
+    pages=(total + limit -1) // limit
+
+    return {
+        "items": plants,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": pages,
+        "has_next": page < pages,
+        "has_prev": page > 1,
+    }
+
+@app.get("/api/plants/low-light",response_model=PaginatedPlants)
+def get_low_light_plants(
+    page:int =1,
+    limit: int =3,
+    db:Session = Depends(get_db)
+):
+    page = max(page,1)
+    limit=max(min(limit,100),1)
+
+    query=db.query(Plant).filter(
+        Plant.light_requirement.ilike("%low%")
+    )
+
+    total= query.count()
+
+    plant=(
+        query.order_by(Plant.id.desc())
+        .offset((page-1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    pages=(total + limit -1) // limit
+
+    return {
+        "items": plant,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": pages,
+        "has_next": page < pages,
+        "has_prev": page > 1,
+    }
+
+@app.get("/api/plants/pet-friendly",response_model=PaginatedPlants)
+def get_pet_friendly(
+    page:int =1,
+    limit:int =3,
+    db:Session = Depends(get_db)
+):
+    page=max(page,1)
+    limit=max(min(limit,100),1)
+
+    query=db.query(Plant).filter(
+        Plant.is_pet_safe == True
+    )
+
+    total=query.count()
+
+    plants=(
+        query.order_by(Plant.id.desc())
+        .offset((page-1)*limit)
+        .limit(limit)
+    )
+
+    pages=(total+limit-1) // limit
+
+    return {
+        "items": plants,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": pages,
+        "has_next": page < pages,
+        "has_prev": page > 1,
+    }
+
 @app.get("/api/plants/{plant_id}", response_model=PlantResponse)
 def get_plant(plant_id: int, db: Session = Depends(get_db)):
     plant = db.query(Plant).filter(Plant.id == plant_id).first()
@@ -750,13 +1023,21 @@ def signup(payload: UserSignup, db: Session = Depends(get_db)):
 @app.post("/api/auth/login", response_model=TokenResponse)
 def login(payload: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(func.lower(User.email) == payload.email.lower()).first()
-    if not user or not verify_password(payload.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="No account found with this email. Please sign up first."
+        )
+
+    if not verify_password(payload.password, user.hashed_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect password. Please try again."
+        )
     # if not user.is_active:
     #     raise HTTPException(status_code=403, detail="Account is disabled")
 
     token = create_access_token({"sub": user.email, "uid": user.id})
-    print(f"\n🔓 Login: {user.email}")
 
     return {
         "access_token": token,
@@ -939,26 +1220,31 @@ def get_plants(
 
 
 @app.post("/api/orders/", response_model=OrderResponse)
-def create_order(order: OrderCreate, db: Session = Depends(get_db),current_user:User=Depends(get_current_user)):
+def create_order(
+    order: OrderCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     if not order.items:
         raise HTTPException(400, "Order must have at least one item")
 
-    subtotal = sum(item.price * item.quantity for item in order.items)
+    subtotal = sum(
+        item.price * item.quantity
+        for item in order.items
+    )
+
     discount = 24.0 if subtotal > 0 else 0
     shipping_fee = 8.0
     tax = 10.0
+
     total = subtotal - discount + shipping_fee + tax
 
-    if order.payment_method == "COD":
-        order_status = "pending"
-    else:
-        order_status = "paid"
-
+    
     db_order = Order(
         user_id=current_user.id,
-        user_email=order.user_email,
+        user_email=current_user.email,
         total=total,
-        status=order_status,         
+        status="pending",
         shipping_name=order.shipping_name,
         shipping_phone=order.shipping_phone,
         shipping_address=order.shipping_address,
@@ -968,32 +1254,51 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db),current_user:
         payment_method=order.payment_method,
         payment_last4=order.payment_last4,
     )
-    db.add(db_order)
-    db.flush() 
 
-    created_date = db_order.created_at or datetime.utcnow()
- 
+    try:
+        db.add(db_order)
+        db.flush()
 
-    db_order.order_number = (f"LF-{created_date:%Y%m%d}-{db_order.id:04d}") 
+        created_date = db_order.created_at or datetime.utcnow()
 
-    for item in order.items:
-        db_item = OrderItem(
-            order_id=db_order.id,
-            plant_id=item.plant_id,
-            plant_name=item.plant_name,
-            image_url=item.image_url,
-            category=item.category,
-            price=item.price,
-            quantity=item.quantity,
-            subtotal=item.price * item.quantity,
+        db_order.order_number = (
+            f"LF-{created_date:%Y%m%d}-{db_order.id:04d}"
         )
-        db.add(db_item)
 
-    db.commit()
-    db.refresh(db_order)
+        # Create a pending Payment record for online payments.
+        if order.payment_method != "COD":
+            db_payment = Payment(
+                order_id=db_order.id,
+                invoice_no=db_order.order_number,
+                amount=total,
+                currency=TWO_C2P_CURRENCY,
+                payment_method="2C2P",
+                status="pending"
+            )
+            db.add(db_payment)
 
-    print("Saved order number:", db_order.order_number)
+        for item in order.items:
+            db_item = OrderItem(
+                order_id=db_order.id,
+                plant_id=item.plant_id,
+                plant_name=item.plant_name,
+                image_url=item.image_url,
+                category=item.category,
+                price=item.price,
+                quantity=item.quantity,
+                subtotal=item.price * item.quantity
+            )
+            db.add(db_item)
+
+        db.commit()
+        db.refresh(db_order)
+
+    except Exception:
+        db.rollback()
+        raise
+
     return db_order
+
 
 @app.get("/api/orders/search",response_model=List[OrderResponse])
 def search_plants(
@@ -1034,32 +1339,51 @@ def get_orders_by_status(
 
     return orders
 
-@app.get("/api/orders/", response_model=List[OrderResponse])
-def get_orders(
-    status: Optional[str] = None,
-    email: Optional[str] = None,
-    skip: int = 0,
-    limit: int = 50,
-    db: Session = Depends(get_db),
-):
-    query = db.query(Order)
+# @app.get("/api/orders/", response_model=List[OrderResponse])
+# def get_orders(
+#     status: Optional[str] = None,
+#     db: Session = Depends(get_db),
+# ):
+#     query = db.query(Order)
 
-    if status:
-        query = query.filter(Order.status == status)
-    if email:
-        query = query.filter(Order.user_email == email)
+#     if status:
+#         query = query.filter(Order.status == status)
+#     if email:
+#         query = query.filter(Order.user_email == email)
 
-    query = query.order_by(desc(Order.created_at))
-    return query.offset(skip).limit(limit).all()
+#     query = query.order_by(desc(Order.created_at))
+#     return query.offset(skip).limit(limit).all()
 
 
 
 @app.get("/api/orders/{order_id}", response_model=OrderResponse)
-def get_order(order_id: int, db: Session = Depends(get_db)):
-    order = db.query(Order).filter(Order.id == order_id).first()
+def get_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    order = db.query(Order).filter(
+        Order.id == order_id,
+        Order.user_id == current_user.id
+    ).first()
+
     if not order:
-        raise HTTPException(404, "Order not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found"
+        )
+
     return order
+
+@app.get("/api/orders/",response_model=List[OrderResponse])
+def get_order(db:Session =Depends(get_db),current_user:User =Depends(get_current_user)):
+    orders=(
+        db.query(Order).filter
+        (Order.user_id == current_user.id)
+        .order_by(Order.created_at.desc())
+    ).all()
+
+    return orders
 
 
 
@@ -1097,29 +1421,368 @@ def update_status(
 
     return order
 
+# @app.post("/api/payments/{order_id}/create")
+# def create_2c2p_payment(
+#     order_id: int,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user)
+# ):
+#     order = db.query(Order).filter(
+#         Order.id == order_id,
+#         Order.user_id == current_user.id
+#     ).first()
 
-@app.get("/api/sales/summary", response_model=SalesSummary)
-def sales_summary(db: Session = Depends(get_db)):
-    total_orders = db.query(Order).count()
+#     if not order:
+#         raise HTTPException(404, "Order not found")
 
-    total_revenue = db.query(func.sum(Order.total)).scalar() or 0
+#     if order.payment_method == "COD":
+#         raise HTTPException(
+#             400,
+#             "COD does not require online payment"
+#         )
 
-    total_items = db.query(func.sum(OrderItem.quantity)).scalar() or 0
+#     payment = db.query(Payment).filter(
+#         Payment.order_id == order.id,
+#         Payment.status == "pending"
+#     ).first()
 
-    avg_order = total_revenue / total_orders if total_orders > 0 else 0
+#     if not payment:
+#         raise HTTPException(
+#             404,
+#             "Payment record not found"
+#         )
 
-    pending = db.query(Order).filter(Order.status == "pending").count()
-    paid = db.query(Order).filter(Order.status == "paid").count()
-    delivered = db.query(Order).filter(Order.status == "delivered").count()
+#     if not all([
+#         TWO_C2P_MERCHANT_ID,
+#         TWO_C2P_SECRET_KEY,
+#         TWO_C2P_BASE_URL,
+#         TWO_C2P_CURRENCY
+#     ]):
+#         raise HTTPException(
+#             500,
+#             "2C2P configuration is missing"
+#         )
+
+#     payload = {
+#         "merchantID": TWO_C2P_MERCHANT_ID,
+#         "invoiceNo": payment.invoice_no,
+#         "description": f"Leafly Order {order.order_number}",
+#         "amount": round(float(payment.amount), 2),
+#         "currencyCode": TWO_C2P_CURRENCY,
+#         # "backendReturnUrl": (
+#         #     "https://rink-coveted-trodden.ngrok-free.dev/api/payments/2c2p/callback"
+#         # ),
+
+#         # "frontendReturnUrl": (
+#         #     "http://localhost:5174/payment-result"
+#         # ),
+
+#         # "locale": "en"
+#     }
+
+#     payload["paymentChannel"] = ["CC"]
+
+#     token = jwt.encode(
+#         payload,
+#         TWO_C2P_SECRET_KEY,
+#         algorithm="HS256"
+#     )
+
+#     try:
+#         response = httpx.post(
+#             f"{TWO_C2P_BASE_URL}/payment/4.3/paymentToken",
+#             json={"payload": token},
+#             headers={"Content-Type": "application/json"},
+#             timeout=30
+#         )
+
+#         print("2C2P Status:", response.status_code)
+#         print("2C2P Response:", response.text)
+
+#         response.raise_for_status()
+
+#         response_data = response.json()
+
+#         print("Response Data:", response_data)
+
+#         if not response_data.get("payload"):
+#             raise HTTPException(
+#                 502,
+#                 "Invalid 2C2P response"
+#             )
+
+#         result = jwt.decode(
+#             response_data["payload"],
+#             TWO_C2P_SECRET_KEY,
+#             algorithms=["HS256"]
+#         )
+
+#     except httpx.HTTPError:
+#         raise HTTPException(
+#             502,
+#             "Unable to connect to 2C2P"
+#         )
+
+#     except jwt.InvalidTokenError:
+#         raise HTTPException(
+#             502,
+#             "Invalid 2C2P response signature"
+#         )
+
+#     if result.get("respCode") != "0000":
+
+#         payment.response_code = result.get("respCode")
+#         payment.response_description = result.get("respDesc")
+
+#         db.commit()
+
+#         raise HTTPException(
+#             502,
+#             detail=result.get(
+#                 "respDesc",
+#                 "Payment token request failed"
+#             )
+#         )
+
+#     payment.response_code = result.get("respCode")
+#     payment.response_description = result.get("respDesc")
+
+    
+
+#     db.commit()
+
+#     return {
+#         "webPaymentUrl": result.get("webPaymentUrl"),
+#         "paymentToken": result.get("paymentToken"),
+#         "respCode": result.get("respCode")
+#     }
+
+
+
+@app.post("/api/payments/{order_id}/create")
+def create_payment(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    order = db.query(Order).filter(
+        Order.id == order_id,
+        Order.user_id == current_user.id
+    ).first()
+
+    if not order:
+        raise HTTPException(404, "Order not found")
+
+    if order.payment_method == "COD":
+        raise HTTPException(
+            400,
+            "COD does not require online payment"
+        )
+
+    payment = db.query(Payment).filter(
+        Payment.order_id == order_id
+    ).first()
+
+    if not payment:
+        raise HTTPException(404, "Payment not found")
+
+    if payment.web_payment_url:
+        return {
+            "webPaymentUrl": payment.web_payment_url,
+            "paymentToken": payment.payment_token,
+            "respCode": payment.response_code or "0000"
+        }
+
+    amount_value = round(float(payment.amount), 2)
+
+    payload = {
+    "merchantID": "JT01",
+    "invoiceNo": payment.invoice_no,
+    "description": f"Leafly Order {order.order_number}",
+    "amount": amount_value,
+    "currencyCode": "SGD",
+    "paymentChannel": ["CC"],
+
+    "frontendReturnUrl": (
+        "https://rink-coveted-trodden.ngrok-free.dev/api/payments/2c2p/return"
+    ),
+
+    "backendReturnUrl": (
+        "https://rink-coveted-trodden.ngrok-free.dev/api/payments/2c2p/callback"
+    )
+}
+    print("Frontend URL:", payload.get("frontendReturnUrl"))
+    print("Backend URL:", payload.get("backendReturnUrl"))
+
+    try:
+        token = jwt.encode(
+            payload,
+            TWO_C2P_SECRET_KEY,
+            algorithm="HS256"
+        )
+
+        response = httpx.post(
+            f"{TWO_C2P_BASE_URL.rstrip('/')}/payment/4.5/paymentToken",
+            json={"payload": token},
+            headers={"Content-Type": "application/json"},
+            timeout=30
+        )
+
+        response.raise_for_status()
+        response_data = response.json()
+
+        if response_data.get("payload"):
+            result = jwt.decode(
+                response_data["payload"],
+                TWO_C2P_SECRET_KEY,
+                algorithms=["HS256"]
+            )
+        else:
+            result = response_data
+
+    except httpx.TimeoutException:
+        raise HTTPException(504, "2C2P request timed out")
+
+    except httpx.HTTPStatusError:
+        raise HTTPException(502, "2C2P HTTP error")
+
+    except httpx.RequestError:
+        raise HTTPException(502, "Unable to connect to 2C2P")
+
+    except jwt.InvalidTokenError:
+        raise HTTPException(502, "Invalid 2C2P response signature")
+
+    except ValueError:
+        raise HTTPException(502, "Invalid JSON response")
+
+    resp_code = str(result.get("respCode", ""))
+    resp_desc = result.get("respDesc")
+
+    payment.response_code = resp_code
+    payment.response_description = resp_desc
+
+    if resp_code == "0000":
+        payment.payment_token = result.get("paymentToken")
+        payment.web_payment_url = result.get("webPaymentUrl")
+        payment.status = "pending"
+
+    db.commit()
+
+    if resp_code != "0000":
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "2C2P payment token request failed",
+                "respCode": resp_code,
+                "respDesc": resp_desc
+            }
+        )
+
+    web_payment_url = result.get("webPaymentUrl")
+
+    if not web_payment_url:
+        raise HTTPException(
+            status_code=502,
+            detail="2C2P did not return a payment URL"
+        )
 
     return {
-        "total_orders": total_orders,
-        "total_revenue": round(total_revenue, 2),
-        "total_items_sold": total_items,
-        "avg_order_value": round(avg_order, 2),
-        "pending_orders": pending,
-        "paid_orders": paid,
-        "delivered_orders": delivered,
+        "webPaymentUrl": web_payment_url,
+        "paymentToken": result.get("paymentToken"),
+        "respCode": resp_code
+    }
+
+
+@app.post("/api/payments/2c2p/return")
+async def payment_return(
+    paymentResponse: str = Form(...)
+):
+    try:
+        decoded = base64.urlsafe_b64decode(
+            paymentResponse + "=" * (-len(paymentResponse) % 4)
+        )
+
+        result = json.loads(decoded.decode("utf-8"))
+
+    except Exception:
+        raise HTTPException(400, "Invalid payment response")
+
+    invoice_no = result.get("invoiceNo")
+    resp_code = result.get("respCode")
+
+    if not invoice_no:
+        raise HTTPException(400, "Invoice number missing")
+
+    frontend_url = os.getenv("FRONTEND_URL")
+
+    return RedirectResponse(
+        url=f"{frontend_url}/payment/return?invoiceNo={invoice_no}&respCode={resp_code}",
+        status_code=303
+    )
+
+@app.post("/api/payments/2c2p/callback")
+async def payment_callback(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    try:
+        data = await request.json()
+
+        encoded_payload = data.get("payload")
+
+        if not encoded_payload:
+            raise HTTPException(400, "2C2P payload missing")
+
+        result = jwt.decode(
+            encoded_payload,
+            TWO_C2P_SECRET_KEY,
+            algorithms=["HS256"]
+        )
+
+    except jwt.InvalidTokenError:
+        raise HTTPException(400, "Invalid 2C2P signature")
+
+    except ValueError:
+        raise HTTPException(400, "Invalid JSON response")
+
+    invoice_no = result.get("invoiceNo")
+    resp_code = str(result.get("respCode", ""))
+
+    if not invoice_no:
+        raise HTTPException(400, "Invoice number missing")
+
+    payment = db.query(Payment).filter(
+        Payment.invoice_no == invoice_no
+    ).first()
+
+    if not payment:
+        raise HTTPException(404, "Payment not found")
+
+    if result.get("merchantID") != "JT01":
+        raise HTTPException(400, "Invalid merchant ID")
+
+    if (
+        round(float(result.get("amount", 0)), 2)
+        != round(float(payment.amount), 2)
+        or result.get("currencyCode") != payment.currency
+    ):
+        raise HTTPException(400, "Payment amount or currency mismatch")
+
+    payment.response_code = resp_code
+    payment.response_description = result.get("respDesc")
+    payment.transaction_id = result.get("tranRef")
+
+    if resp_code == "0000":
+        payment.status = "paid"
+    else:
+        payment.status = "failed"
+
+    db.commit()
+
+    return {
+        "message": "Payment callback processed",
+        "invoiceNo": invoice_no,
+        "status": payment.status
     }
 
 
@@ -1352,7 +2015,7 @@ def search_plants(
     }
 
 
-@app.post("/api/addresses/", response_model=list[AddressResponse])
+@app.post("/api/addresses/")
 def create_address(
     data: AddressCreate,
     db: Session = Depends(get_db),
@@ -1371,9 +2034,10 @@ def create_address(
 
     db.add(address)
     db.commit()
-    db.refresh(address)
 
-    return address
+    return {
+        "message": "Address saved successfully"
+    }
 
 @app.patch("/api/addresses/")
 def patch_address(
@@ -1527,6 +2191,8 @@ def delete_checkout_draft(
     db.commit()
 
     return {"message": "Checkout draft deleted successfully"}
+
+
 
 def seed_plants():
     db = SessionLocal()
@@ -1760,7 +2426,7 @@ def main():
     seed_plants()
 
     print("\n Menu:")
-    print("   1. Start API server (http://127.0.0.1:8000)")
+    print("   1. Start API server (http://127.0.0.1:8001)")
     print("   2. View all plants in terminal")
     print("   3. Exit")
 

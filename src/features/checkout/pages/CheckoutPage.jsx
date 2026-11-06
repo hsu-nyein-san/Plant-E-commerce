@@ -10,9 +10,12 @@ import { useLocation } from 'react-router-dom'
 const CheckoutPage = () => {
   const location = useLocation();
 
+  const isPaymentReturn = location.pathname === "/payment/return";
+
+
   const [order,setOrder]=useState([]);
 
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(isPaymentReturn ? 4 : 1);
 
   const [shippingData, setShippingData] = useState({
     fullName: '',
