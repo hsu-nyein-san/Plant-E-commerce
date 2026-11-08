@@ -9,52 +9,52 @@ const ConfirmationState = ({
   onViewOrder,
   order_Id
 }) => {
-  const [order,setOrder]=useState([])
-  
+  const [order, setOrder] = useState([])
 
-  const [token]=useCookie("token");
+
+  const [token] = useCookie("token");
 
   const placedAt = order?.created_at
     ? new Date(order.created_at).toLocaleString('en-US', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      })
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    })
     : 'Recently'
 
-    console.log(order_Id);
-    
+  console.log(order_Id);
+
 
   useEffect(() => {
-  const fetchOrder = async () => {
-    try {
-      const res = await fetch(
-        `http://127.0.0.1:8000/api/orders/${Number(order_Id)}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+    const fetchOrder = async () => {
+      try {
+        const res = await fetch(
+          `http://127.0.0.1:8000/api/orders/${Number(order_Id)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await res.json();
+
+
+
+        if (res.ok) {
+          setOrder(data);
         }
-      );
-
-      const data = await res.json();
-
-      
-
-      if (res.ok) {
-        setOrder(data);
+      } catch (error) {
+        console.error(error);
       }
-    } catch (error) {
-      console.error(error);
-    }
-  };
+    };
 
-  fetchOrder();
-}, [order_Id, token]);
+    fetchOrder();
+  }, [order_Id, token]);
 
-useEffect(() => {
-  console.log("Updated order:", order);
-}, [order]);
-  
+  useEffect(() => {
+    console.log("Updated order:", order);
+  }, [order]);
+
 
   const email = order?.user_email || 'your email'
   const total = Number(order?.total ?? order?.total_amount ?? 0)
@@ -120,10 +120,12 @@ useEffect(() => {
               <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-1">
                 Need help?
               </p>
-              <Button
-                text="View plant care guide"
-                variant="secondaryDark"
-              />
+              <Link to="/plant-care-guide">
+                <Button
+                  text="View plant care guide"
+                  variant="secondaryDark"
+                />
+              </Link>
             </div>
 
           </div>
@@ -141,14 +143,14 @@ useEffect(() => {
             </Link>
 
             <Link to={`/my-orders/${order_Id}`}>
-            <Button
-              variant="secondaryDark"
-              text="View order details"
-              onClick={onViewOrder}
-            />
+              <Button
+                variant="secondaryDark"
+                text="View order details"
+                onClick={onViewOrder}
+              />
             </Link>
 
-            
+
           </div>
 
           <p className="text-[10px] sm:text-xs text-gray-400 mt-6 leading-relaxed break-words">

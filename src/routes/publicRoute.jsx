@@ -7,6 +7,7 @@ import CheckoutPage from "../features/checkout/pages/CheckoutPage";
 import OrderPage from "../features/order/page/OrderPage";
 import WishListPage from "../features/wishlist/page/WishListPage";
 import OrderDetailPage from "../features/order/page/OrderDetailPage";
+import PlantCareGuidePage from "../features/checkout/pages/PlantCareGuidePage";
 
 const AboutUsPage = lazy(() => import("../features/public/pages/AboutUsPage"));
 const ContactUsPage = lazy(() => import("../features/public/pages/ContactUsPage"));
@@ -32,6 +33,10 @@ const publicRoute = [
   {
   path: "payment/return",
   element: <CheckoutPage />,
+},
+{
+  path: "/plant-care-guide",
+  element: <PlantCareGuidePage />,
 },
   {
     path: "cart",
