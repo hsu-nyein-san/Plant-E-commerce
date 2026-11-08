@@ -1,79 +1,88 @@
+
 import React, { useState } from 'react'
+import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 
-const SideFilters = ({setResult,setPagination, page = 1, limit = 6}) => {
+const SideFilters = ({
+  setResult,
+  setPagination,
+  page = 1,
+  limit = 6
+}) => {
   const [price, setPrice] = useState(50)
-  const [roomLight,setRoomLight]=useState(null);
-  const [size,setSize]=useState([]);
-  const [pet,setPet]=useState(null);
-  const [careLevel,setCareLevel]=useState([]);
-  const [category,setCategory]=useState([]);
-  const [loading,setLoading]=useState(false);
-  const [error,setError]=useState(null);
+  const [roomLight, setRoomLight] = useState(null)
+  const [size, setSize] = useState([])
+  const [pet, setPet] = useState(null)
+  const [careLevel, setCareLevel] = useState([])
+  const [category, setCategory] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [isOpen, setIsOpen] = useState(false)
 
-  const roomLightOptions=[
-    'Low','Medium','Bright indirect','Full Sun'
+  const roomLightOptions = [
+    'Low', 'Medium', 'Bright indirect', 'Full Sun'
   ]
-  const sizeOptions=[
-    'Small (Under 12")','Medium (12"-36")','Large (36"+)'
+
+  const sizeOptions = [
+    'Small (Under 12")',
+    'Medium (12"-36")',
+    'Large (36"+)'
   ]
 
   const petOptions = [
-    {
-      label: 'Yes', value: true
-    },
-    {
-      label: 'No', value: false
-    }
+    { label: 'Yes', value: true },
+    { label: 'No', value: false }
   ]
 
-  const careLevelOptions=[
-    'Easy','Moderate','Advanced'
+  const careLevelOptions = [
+    'Easy', 'Moderate', 'Advanced'
   ]
 
-  const categoryOptions=[
-    'Tropical','Succulents','Air Purifying'
+  const categoryOptions = [
+    'Tropical', 'Succulents', 'Air Purifying'
   ]
 
-  const handleResults=async(targetPage =1)=>{
+  const handleResults = async (targetPage = 1) => {
     try {
-      setLoading(true);
-      const payload={
-        room_light:roomLight,
-        size:size,
-        pet_friendly:pet,
-        care_level:careLevel,
-        price:price,
-        category:category
+      setLoading(true)
+      setError(null)
+
+      const payload = {
+        room_light: roomLight,
+        size,
+        pet_friendly: pet,
+        care_level: careLevel,
+        price,
+        category
       }
-      const res=await fetch(`http://127.0.0.1:8000/api/plant/?page=${page}&limit=${limit}`,{
-        method: 'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(payload)
+
+      const res = await fetch(
+        `http://127.0.0.1:8000/api/plant/?page=${targetPage}&limit=${limit}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        }
+      )
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      const matched = await res.json()
+
+      setResult?.(matched.items)
+
+      setPagination?.({
+        total: matched.total,
+        page: matched.page,
+        limit: matched.limit,
+        pages: matched.pages,
+        has_next: matched.has_next,
+        has_prev: matched.has_prev
       })
-      
-      if (!res.ok) throw new Error(`Http ${res.status}`)
-      
 
-        console.log('📥 Status:', payload)
+      setIsOpen(false)
 
-      const matched=await res.json();
-
-      // console.log(matched);
-      
-      
-
-      if(setResult) setResult(matched.items)
-
-
-        if (setPagination) setPagination({
-          total:matched.total,
-          page:matched.page,
-          limit:matched.limit,
-          pages:matched.pages,
-          has_next:matched.has_next,
-          has_prev:matched.has_prev,
-        })
-      
     } catch (error) {
       console.error('Plant filter failed:', error)
       setError(error.message)
@@ -82,166 +91,151 @@ const SideFilters = ({setResult,setPagination, page = 1, limit = 6}) => {
     }
   }
 
-  const handleReset=()=>{
-    setRoomLight(null);
-    setSize([]);
-    setPet(null);
-    setCareLevel([]);
-    setPrice(50);
-    setCategory([]);
+  const handleReset = () => {
+    setRoomLight(null)
+    setSize([])
+    setPet(null)
+    setCareLevel([])
+    setPrice(50)
+    setCategory([])
+    setError(null)
   }
 
   return (
-    <div className="border rounded-lg border-border">
-      <aside className=" flex-shrink-0 p-4">
+    <div className="border border-border rounded-lg bg-white">
 
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="lg:hidden w-full flex justify-between items-center p-4"
+      >
+        <span className="flex items-center gap-2 font-semibold text-gray-900">
+          <SlidersHorizontal size={18} />
+          Filters
+        </span>
 
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="font-semibold text-gray-900">Filters</h2>
+        <ChevronDown
+          size={18}
+          className={`transition-transform ${
+            isOpen ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
 
-          <div className="text-xs text-gray-500 space-x-3">
-            <button onClick={()=>handleReset()} className="hover:text-black transition-colors">
-              Reset
-            </button>
+      <aside className={`${isOpen ? 'block' : 'hidden'} lg:block p-4`}>
 
-            <button className="hover:text-black transition-colors">
-              Collapse
-            </button>
-          </div>
+        <div className="flex justify-between items-center mb-5">
+          <h2 className="font-semibold text-gray-900 hidden lg:block">
+            Filters
+          </h2>
+
+          <button
+            onClick={handleReset}
+            className="text-xs text-gray-500 hover:text-black transition-colors"
+          >
+            Reset
+          </button>
         </div>
 
         <div className="text-sm">
 
-          
-          <div className="mb-4">
-            <h3 className="font-medium text-gray-900 mb-3 text-sm">
+          <div className="mb-5">
+            <h3 className="font-medium text-gray-900 mb-3">
               Light requirement
             </h3>
 
-            <div className="space-y-2 grid grid-cols-2">
-              {
-                roomLightOptions.map((room_light,idx)=>(
-                  <label key={idx} className="flex items-center gap-2 cursor-pointer">
-                <input checked={room_light === roomLight}  onClick={()=>setRoomLight(room_light)}
-                  type="radio"
-                  name='light'
-                  className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
-                />
-                <span className="text-sm text-gray-600">
-                  {room_light}
-                </span>
-              </label>
-                ))
-              }
-
-              
+            <div className="grid grid-cols-2 gap-3">
+              {roomLightOptions.map((option) => (
+                <label key={option} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="light"
+                    checked={roomLight === option}
+                    onChange={() => setRoomLight(option)}
+                    className="w-4 h-4 accent-black"
+                  />
+                  <span className="text-gray-600 text-xs sm:text-sm">
+                    {option}
+                  </span>
+                </label>
+              ))}
             </div>
           </div>
 
-          {/* Size */}
-          <div className="mb-4">
-            <h3 className="font-medium text-gray-900 mb-3 text-sm">
-              Size
-            </h3>
+          <div className="mb-5">
+            <h3 className="font-medium text-gray-900 mb-3">Size</h3>
 
-            <div className="space-y-2">
-              {
-                sizeOptions.map((sizeOption,idx)=>(
-                  <label key={idx} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={size.includes(sizeOption)}
-                  onChange={(e)=>{
-                    if (e.target.checked)
-                    {
-                      setSize([...size,sizeOption])
-                    }
-                    else
-                    {
-                      setSize(size.filter((item)=>item != sizeOption))
-                    }
-                  }}
-                  className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
-                />
-                <span className="text-sm text-gray-600">
-                  {sizeOption}
-                </span>
-              </label>
-                ))
-              }
-
-              
+            <div className="space-y-3">
+              {sizeOptions.map((option) => (
+                <label key={option} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={size.includes(option)}
+                    onChange={(e) => {
+                      setSize(prev =>
+                        e.target.checked
+                          ? [...prev, option]
+                          : prev.filter(item => item !== option)
+                      )
+                    }}
+                    className="w-4 h-4 accent-black"
+                  />
+                  <span className="text-gray-600 text-xs sm:text-sm">
+                    {option}
+                  </span>
+                </label>
+              ))}
             </div>
           </div>
 
-          {/* Pet Friendly */}
-          <div className="mb-4">
-            <h3 className="font-medium text-gray-900 mb-3 text-sm">
+          <div className="mb-5">
+            <h3 className="font-medium text-gray-900 mb-3">
               Pet-friendly
             </h3>
 
-            <div className="space-y-2">
-              {
-                petOptions.map((pet_option,idx)=>(
-                  <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  checked={pet === pet_option.value}
-                  name='pet_friendly'         
-                  type="radio" key={idx}
-                  onChange={()=>setPet(pet_option.value)}
-                  className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
-                />
-                <span className="text-sm text-gray-600">
-                  {pet_option.label}
-                </span>
-              </label>
-                ))
-              }
-
-              
+            <div className="flex gap-6">
+              {petOptions.map((option) => (
+                <label key={String(option.value)} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="pet_friendly"
+                    checked={pet === option.value}
+                    onChange={() => setPet(option.value)}
+                    className="w-4 h-4 accent-black"
+                  />
+                  <span className="text-gray-600">{option.label}</span>
+                </label>
+              ))}
             </div>
           </div>
 
-          {/* Care Level */}
-          <div className="mb-4">
-            <h3 className="font-medium text-gray-900 mb-3 text-sm">
+          <div className="mb-5">
+            <h3 className="font-medium text-gray-900 mb-3">
               Care level
             </h3>
 
-            <div className="space-y-2">
-              {
-                careLevelOptions.map((opt)=>(
-                  <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={careLevel.includes(opt)}
-                  onChange={(e)=>{
-                    if(e.target.checked)
-                    {
-                      setCareLevel([...careLevel,opt])
-                    }
-                    else{
-                      setCareLevel(careLevel.filter((item)=> item != opt))
-                    }
-                  }}
-                  className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
-                />
-                <span className="text-sm text-gray-600">
-                  {opt}
-                </span>
-              </label>
-                ))
-              }
-
-              
-
-             
+            <div className="space-y-3">
+              {careLevelOptions.map((option) => (
+                <label key={option} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={careLevel.includes(option)}
+                    onChange={(e) => {
+                      setCareLevel(prev =>
+                        e.target.checked
+                          ? [...prev, option]
+                          : prev.filter(item => item !== option)
+                      )
+                    }}
+                    className="w-4 h-4 accent-black"
+                  />
+                  <span className="text-gray-600">{option}</span>
+                </label>
+              ))}
             </div>
           </div>
 
-          {/* Price Range */}
-          <div className="mb-4">
-            <h3 className="font-medium text-gray-900 mb-3 text-sm">
+          <div className="mb-5">
+            <h3 className="font-medium text-gray-900 mb-3">
               Price range
             </h3>
 
@@ -250,72 +244,61 @@ const SideFilters = ({setResult,setPagination, page = 1, limit = 6}) => {
               min="0"
               max="100"
               value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-black"
+              onChange={(e) => setPrice(Number(e.target.value))}
+              className="w-full accent-black cursor-pointer"
             />
 
-            <div className="flex justify-between items-center mt-3">
-              <div className="border border-gray-200 rounded-md px-3 py-1 text-gray-600 text-xs w-20 text-center">
+            <div className="flex justify-between mt-3">
+              <span className="border rounded-md px-3 py-1 text-xs text-gray-600">
                 ${price}
-              </div>
-
-              <div className="border border-gray-200 rounded-md px-3 py-1 text-gray-600 text-xs w-20 text-center">
+              </span>
+              <span className="border rounded-md px-3 py-1 text-xs text-gray-600">
                 $100+
-              </div>
+              </span>
             </div>
           </div>
 
-          {/* Categories */}
-          <div className="mb-4">
-            <h3 className="font-medium text-gray-900 mb-3 text-sm">
+          <div className="mb-5">
+            <h3 className="font-medium text-gray-900 mb-3">
               Categories
             </h3>
 
-            <div className="space-y-2">
-
-              {
-                categoryOptions.map((opt)=>(
-                  <label className="flex items-center justify-between cursor-pointer">
-                <div className="flex items-center gap-2">
+            <div className="space-y-3">
+              {categoryOptions.map((option) => (
+                <label key={option} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={category.includes(opt)}
-                    onChange={(e)=>{
-                      if(e.target.checked)
-                      {
-                        setCategory([...category,opt])
-                      }
-                      else{
-                        setCategory(category.filter((item)=> item != opt))
-                      }
+                    checked={category.includes(option)}
+                    onChange={(e) => {
+                      setCategory(prev =>
+                        e.target.checked
+                          ? [...prev, option]
+                          : prev.filter(item => item !== option)
+                      )
                     }}
-                    className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
+                    className="w-4 h-4 accent-black"
                   />
-                  <span className="text-sm text-gray-600">
-                    {opt}
-                  </span>
-                </div>
-
-                <span className="text-gray-400 text-xs">
-                  28
-                </span>
-              </label>
-                ))
-              }
-
-            
-
+                  <span className="text-gray-600">{option}</span>
+                </label>
+              ))}
             </div>
           </div>
 
-          {/* Tip */}
-          <p className="text-xs text-gray-400 mb-4 pb-6 border-b border-gray-100">
-            Tip: Use the keyboard to navigate filters and press Enter to apply.
+          <p className="text-xs text-gray-400 mb-4 pb-5 border-b border-gray-100">
+            Tip: Select your preferences and apply filters to find
+            the perfect plants for your space.
           </p>
 
-          {/* Button */}
-          <button onClick={()=>handleResults()} className="w-full bg-black text-white py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition-colors">
-            Show filters
+          {error && (
+            <p className="text-xs text-red-500 mb-3">{error}</p>
+          )}
+
+          <button
+            onClick={() => handleResults(page)}
+            disabled={loading}
+            className="w-full bg-black text-white py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          >
+            {loading ? 'Applying...' : 'Show filters'}
           </button>
 
         </div>
