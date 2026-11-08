@@ -32,7 +32,7 @@ const Curated_pick_item = ({ product }) => {
                    id : plant.id,
                     name: plant.name,
                     price:plant.price,
-                    image:plant.image,
+                    image:plant.image || plant.image_url,
                     category:plant.category,
                     quantity: 1,
                 }
