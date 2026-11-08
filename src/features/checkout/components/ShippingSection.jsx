@@ -400,7 +400,7 @@ const onSubmit = async (data) => {
         </div>
         <div>
           <h3 className="text-sm font-medium text-gray-900 mb-4">Choose delivery date & time</h3>
-          <div className="flex gap-6 items-center">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center">
             <div className="w-24 h-24 relative flex items-center justify-center">
               <div className="absolute top-2 left-2 w-10 h-10 bg-gray-800 rounded-full opacity-90"></div>
               <div className="absolute bottom-4 left-0 w-6 h-6 bg-gray-800 rounded-full opacity-80"></div>
@@ -436,7 +436,7 @@ const onSubmit = async (data) => {
           </div>
         </div>
       </div>
-      <div className="flex items-center justify-between mt-10 pt-6 border-t border-gray-100">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 mt-10 pt-6 border-t border-gray-100">
         {
           user.id ? (
             <div className="flex items-center gap-2">
@@ -446,11 +446,11 @@ const onSubmit = async (data) => {
           ) : (<Link to="/login">
             <Button text="login" variant="dark" /></Link>)
         }
-        <div className="flex gap-4">
-          <button onClick={handleSubmit(handleSave)} className="px-6 py-3 text-sm font-medium text-gray-600 hover:text-black transition-colors">
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <button onClick={handleSubmit(handleSave)} className="w-full sm:w-auto px-6 py-3 text-sm font-medium text-gray-600 hover:text-black transition-colors">
             Save & continue later
           </button>
-          <button type='submit' className="px-6 py-3 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors">
+          <button type='submit' className="w-full sm:w-auto px-6 py-3 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors">
             Continue to payment
           </button>
         </div>

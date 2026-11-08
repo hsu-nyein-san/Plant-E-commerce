@@ -1421,143 +1421,6 @@ def update_status(
 
     return order
 
-# @app.post("/api/payments/{order_id}/create")
-# def create_2c2p_payment(
-#     order_id: int,
-#     db: Session = Depends(get_db),
-#     current_user: User = Depends(get_current_user)
-# ):
-#     order = db.query(Order).filter(
-#         Order.id == order_id,
-#         Order.user_id == current_user.id
-#     ).first()
-
-#     if not order:
-#         raise HTTPException(404, "Order not found")
-
-#     if order.payment_method == "COD":
-#         raise HTTPException(
-#             400,
-#             "COD does not require online payment"
-#         )
-
-#     payment = db.query(Payment).filter(
-#         Payment.order_id == order.id,
-#         Payment.status == "pending"
-#     ).first()
-
-#     if not payment:
-#         raise HTTPException(
-#             404,
-#             "Payment record not found"
-#         )
-
-#     if not all([
-#         TWO_C2P_MERCHANT_ID,
-#         TWO_C2P_SECRET_KEY,
-#         TWO_C2P_BASE_URL,
-#         TWO_C2P_CURRENCY
-#     ]):
-#         raise HTTPException(
-#             500,
-#             "2C2P configuration is missing"
-#         )
-
-#     payload = {
-#         "merchantID": TWO_C2P_MERCHANT_ID,
-#         "invoiceNo": payment.invoice_no,
-#         "description": f"Leafly Order {order.order_number}",
-#         "amount": round(float(payment.amount), 2),
-#         "currencyCode": TWO_C2P_CURRENCY,
-#         # "backendReturnUrl": (
-#         #     "https://rink-coveted-trodden.ngrok-free.dev/api/payments/2c2p/callback"
-#         # ),
-
-#         # "frontendReturnUrl": (
-#         #     "http://localhost:5174/payment-result"
-#         # ),
-
-#         # "locale": "en"
-#     }
-
-#     payload["paymentChannel"] = ["CC"]
-
-#     token = jwt.encode(
-#         payload,
-#         TWO_C2P_SECRET_KEY,
-#         algorithm="HS256"
-#     )
-
-#     try:
-#         response = httpx.post(
-#             f"{TWO_C2P_BASE_URL}/payment/4.3/paymentToken",
-#             json={"payload": token},
-#             headers={"Content-Type": "application/json"},
-#             timeout=30
-#         )
-
-#         print("2C2P Status:", response.status_code)
-#         print("2C2P Response:", response.text)
-
-#         response.raise_for_status()
-
-#         response_data = response.json()
-
-#         print("Response Data:", response_data)
-
-#         if not response_data.get("payload"):
-#             raise HTTPException(
-#                 502,
-#                 "Invalid 2C2P response"
-#             )
-
-#         result = jwt.decode(
-#             response_data["payload"],
-#             TWO_C2P_SECRET_KEY,
-#             algorithms=["HS256"]
-#         )
-
-#     except httpx.HTTPError:
-#         raise HTTPException(
-#             502,
-#             "Unable to connect to 2C2P"
-#         )
-
-#     except jwt.InvalidTokenError:
-#         raise HTTPException(
-#             502,
-#             "Invalid 2C2P response signature"
-#         )
-
-#     if result.get("respCode") != "0000":
-
-#         payment.response_code = result.get("respCode")
-#         payment.response_description = result.get("respDesc")
-
-#         db.commit()
-
-#         raise HTTPException(
-#             502,
-#             detail=result.get(
-#                 "respDesc",
-#                 "Payment token request failed"
-#             )
-#         )
-
-#     payment.response_code = result.get("respCode")
-#     payment.response_description = result.get("respDesc")
-
-    
-
-#     db.commit()
-
-#     return {
-#         "webPaymentUrl": result.get("webPaymentUrl"),
-#         "paymentToken": result.get("paymentToken"),
-#         "respCode": result.get("respCode")
-#     }
-
-
 
 @app.post("/api/payments/{order_id}/create")
 def create_payment(
@@ -1690,6 +1553,43 @@ def create_payment(
         "webPaymentUrl": web_payment_url,
         "paymentToken": result.get("paymentToken"),
         "respCode": resp_code
+    }
+
+@app.get("/api/payments/verify/{invoice_no}")
+def verify_payment(
+    invoice_no:str,
+    db:Session=Depends(get_db),
+    current_user:User =Depends(get_current_user)
+):
+    payment=db.query(Payment).filter(
+        Payment.invoice_no == invoice_no
+    ).first()
+
+    if not payment:
+        raise HTTPException(
+            status_code=404,
+            detail="Payment not found"
+        )
+
+    order = db.query(Order).filter(
+    Order.id == payment.order_id,
+    Order.user_id == current_user.id
+).first()
+
+    if not order:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found"
+        )
+    return {
+        "invoice_no": payment.invoice_no,
+        "status": payment.status,
+        "response_code": payment.response_code,
+        "transaction_id": payment.transaction_id,
+        "order": {
+            "id": order.id,
+            "payment_method": order.payment_method,
+        }
     }
 
 

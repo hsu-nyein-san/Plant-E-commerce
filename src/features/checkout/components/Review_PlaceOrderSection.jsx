@@ -21,6 +21,19 @@ const Review_PlaceOrderSection = ({ items = [] ,shippingData={} ,paymentData={} 
     return;
   }
 
+  setOrder({
+
+      user_email: shippingData.email,
+      shipping_name: shippingData.fullName,
+      shipping_phone: shippingData.phone,
+      shipping_address: shippingData.address,
+      shipping_city: shippingData.city,
+      shipping_zip: shippingData.zip,
+      shipping_country: shippingData.country || "Myanmar",
+      total: total
+
+    })
+
   try {
     const payload = {
       user_email: shippingData.email,
@@ -60,11 +73,12 @@ const Review_PlaceOrderSection = ({ items = [] ,shippingData={} ,paymentData={} 
 
     const order = await res.json();
 
+    
+
     if (!res.ok) {
       throw new Error(order.detail || "Failed to create order");
     }
 
-    // 2. COD
     if (order.payment_method === "COD") {
       localStorage.removeItem("leafly_cart");
       localStorage.removeItem("checkout_draft");
@@ -116,6 +130,8 @@ const Review_PlaceOrderSection = ({ items = [] ,shippingData={} ,paymentData={} 
   }
 };
 
+
+
   return (
     <div className=''>
       <SectionHeader
@@ -135,7 +151,6 @@ const Review_PlaceOrderSection = ({ items = [] ,shippingData={} ,paymentData={} 
           )}
         </div>
 
-        {/* Totals */}
         <div className="space-y-3 text-sm">
           {discount > 0 && (
             <div className="flex justify-between text-gray-500">
