@@ -24,9 +24,14 @@ const Header = () => {
   const isLoggedIn = Boolean(user && token);
 
   const [cartItem, setCartItem] = useState(() => {
-    const cart = localStorage.getItem("leafly_cart");
-    return cart ? JSON.parse(cart) : [];
-  });
+    try {
+        const savedCart = localStorage.getItem("leafly_cart");
+        return savedCart ? JSON.parse(savedCart) : [];
+    } catch {
+        localStorage.removeItem("leafly_cart");
+        return [];
+    }
+});
 
   useEffect(() => {
     const updateCart = () => {
