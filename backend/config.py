@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Database Configuration
 DB_USER = "root"
 DB_PASSWORD = ""
 DB_HOST = "localhost"
